@@ -1,6 +1,6 @@
 ---
 id: awb-mc0p
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-04-17T12:17:50Z
@@ -8,7 +8,7 @@ type: chore
 priority: 2
 assignee: Jens Kouros
 ---
-# Pin all dependencies and update them to current versions
+# [awb-mc0p] Pin all dependencies and update them to current versions
 
 Review all direct dependencies, pin versions instead of loose ranges where applicable, and update them to current stable releases. Refresh lockfile and verify the project still builds and tests cleanly with Bun.
 
