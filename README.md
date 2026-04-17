@@ -8,6 +8,7 @@ The current app already provides:
 - a local CLI executable: `awb`
 - parsing of `tk`-style `.tickets/*.md`
 - browser views for Graph, Kanban, and Details
+- a toggleable pi-powered agent panel
 - live reload when ticket files change
 
 The intended next step for `awb` is to add an agent panel and execution flow so the workbench can not only view tickets, but also implement and work on them.
@@ -54,6 +55,20 @@ awb --dev
 - **Graph**: dependency-oriented ticket graph
 - **Kanban**: tickets grouped by status
 - **Details**: full ticket metadata and markdown body
+- **Agent panel**: server-embedded pi SDK session with SSE-driven transcript and tool activity
+
+## Agent panel requirements
+
+The agent panel embeds `@mariozechner/pi-coding-agent` directly in the awb server process.
+
+Operational assumptions:
+
+- pi authentication and model configuration come from the user's normal pi setup
+- if no pi auth or no usable model is configured, the panel stays visible and reports the initialization error
+- panel sessions are stored separately from normal pi terminal sessions under `<project>/.awb/pi-sessions/`
+- project-local pi discovery still applies via the project cwd, including `.pi/extensions/`, `.pi/prompts/`, skills, and `AGENTS.md`
+
+The browser only receives serialized agent state and incremental SSE events. It does not access raw pi SDK objects directly.
 
 ## Ticket format
 

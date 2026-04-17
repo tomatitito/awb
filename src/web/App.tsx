@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { AgentPanel } from './AgentPanel'
+import { useAgentPanel } from './useAgentPanel'
 import type { AppData, DerivedTicket } from '../core/types'
 import { deriveVisibleGraph, type VisibleGraphDerivation } from '../core/graph'
 import {
@@ -649,6 +650,8 @@ export default function App() {
   const [graphDirection, setGraphDirection] = useState<GraphDirection>('lr')
   const [showCriticalPath, setShowCriticalPath] = useState(true)
   const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false)
+  const agentPanel = useAgentPanel()
+  const { setSelectedTicketContext } = agentPanel
   const hasLoadedOnceRef = useRef(false)
 
   useEffect(() => {
@@ -711,6 +714,15 @@ export default function App() {
     () => (data ? deriveVisibleGraph(data.graph, graphTickets, selectedTicket) : undefined),
     [data, graphTickets, selectedTicket],
   )
+
+  useEffect(() => {
+    void setSelectedTicketContext(selectedTicket ? {
+      ticketId: selectedTicket.id,
+      title: selectedTicket.title,
+      body: selectedTicket.body,
+      filePath: selectedTicket.filePath,
+    } : undefined)
+  }, [selectedTicket, setSelectedTicketContext])
 
   if (!data || !visibleGraph) {
     return <div className="loading">{hasLoadedOnceRef.current ? 'Refreshing tickets…' : 'Loading tickets…'}</div>
@@ -840,7 +852,16 @@ export default function App() {
           ) : null}
         </div>
 
-        {isAgentPanelOpen ? <AgentPanel ticket={selectedTicket} tab={tab} ticketCount={visibleTickets.length} /> : null}
+        {isAgentPanelOpen ? (
+          <AgentPanel
+            ticket={selectedTicket}
+            state={agentPanel.state}
+            transcript={agentPanel.transcript}
+            toolActivity={agentPanel.toolActivity}
+            onSendPrompt={agentPanel.sendPrompt}
+            onAbort={agentPanel.abort}
+          />
+        ) : null}
       </main>
     </div>
   )
