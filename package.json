@@ -1,0 +1,48 @@
+{
+  "name": "awb",
+  "version": "0.1.0",
+  "description": "Agentic workbench built on the tk-style ticket viewer UI",
+  "type": "module",
+  "packageManager": "bun@1.2.18",
+  "bin": {
+    "awb": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.json",
+    "build:web": "vite build",
+    "build:node": "tsc -p tsconfig.json",
+    "dev": "bun src/cli.ts --dev",
+    "start": "bun dist/cli.js"
+  },
+  "keywords": [
+    "tickets",
+    "kanban",
+    "graph",
+    "cli",
+    "viewer",
+    "agent",
+    "workbench"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cytoscape": "^3.30.4",
+    "express": "^4.21.2",
+    "fast-glob": "^3.3.3",
+    "gray-matter": "^4.0.3",
+    "open": "^10.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "0.25.12",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2"
+  }
+}
