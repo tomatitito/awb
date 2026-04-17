@@ -866,7 +866,7 @@ export function DetailsView({
   ticketById: Map<string, DerivedTicket>
   onSelect: (id: string) => void
 }) {
-  if (!ticket) return <div className="empty-state">Select a ticket in Graph or Kanban.</div>
+  if (!ticket) return <div className="empty-state">Select a ticket in Graph or Kanban to open its full details.</div>
 
   return (
     <div className="details-view">
@@ -913,6 +913,8 @@ export function AgentOverlay({
   onSendPrompt,
   onAbort,
   onClose,
+  fullscreen = false,
+  returnToLabel,
 }: {
   ticket?: DerivedTicket
   state: AgentPanelState
@@ -921,14 +923,23 @@ export function AgentOverlay({
   onSendPrompt: (text: string) => Promise<void>
   onAbort: () => Promise<void>
   onClose: () => void
+  fullscreen?: boolean
+  returnToLabel?: TabKey
 }) {
+  const closeLabel = returnToLabel ? `Back to ${returnToLabel}` : 'Close'
+
   return (
-    <div className="agent-overlay" role="dialog" aria-modal="true" aria-label="Agent panel overlay">
+    <div
+      className={`agent-overlay ${fullscreen ? 'agent-overlay-fullscreen' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Agent panel overlay"
+    >
       <button type="button" className="agent-overlay-backdrop" aria-label="Close agent panel" onClick={onClose} />
       <div className="agent-overlay-sheet">
         <div className="agent-overlay-header">
           <strong>Agent</strong>
-          <button type="button" className="secondary-button" onClick={onClose}>Close</button>
+          <button type="button" className="secondary-button" onClick={onClose}>{closeLabel}</button>
         </div>
         <AgentPanel
           ticket={ticket}

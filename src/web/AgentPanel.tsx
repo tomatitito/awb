@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+const PAUSE_UNAVAILABLE_REASON = 'Pause is not yet supported by the current agent runtime. Closing the panel will keep the current run active.'
 import type { DerivedTicket } from '../core/types'
 import type { AgentPanelState } from '../agent/types'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
@@ -135,7 +137,7 @@ export function AgentPanel({
           placeholder="Ask the agent what to do next"
           rows={5}
         />
-        <div className="agent-composer-actions">
+        <div className="agent-run-controls" aria-label="Agent execution controls">
           <button type="submit" className="primary-button" disabled={state.status === 'connecting' || state.isStreaming}>
             Send
           </button>
@@ -150,9 +152,19 @@ export function AgentPanel({
               })
             }}
           >
-            Abort
+            Stop
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled
+            title={PAUSE_UNAVAILABLE_REASON}
+            aria-disabled="true"
+          >
+            Pause
           </button>
         </div>
+        <div className="agent-composer-note">{PAUSE_UNAVAILABLE_REASON}</div>
       </form>
     </aside>
   )

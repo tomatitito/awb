@@ -56,6 +56,7 @@ export type WorkspaceLayoutProps = {
   showCriticalPath: boolean
   onShowCriticalPathChange: (value: boolean) => void
   isAgentPanelOpen: boolean
+  lastActiveWorkspaceTab: TabKey
   onToggleAgentPanel: () => void
   onCloseAgentPanel: () => void
   agentPanel: {
@@ -288,6 +289,16 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
 }
 
 function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
+  const openDetailsForTicket = (id: string) => {
+    props.onSelectTicket(id)
+    props.onTabChange('details')
+  }
+
+  const showSelectedTicketInDetails = (id: string) => {
+    props.onSelectTicket(id)
+    props.onTabChange('details')
+  }
+
   return (
     <WorkspaceChrome {...props}>
       <main className="content mobile-content">
@@ -301,18 +312,18 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
               direction={props.graphDirection}
               directionPreference={props.graphDirectionPreference}
               showCriticalPath={props.showCriticalPath}
-              onSelect={props.onSelectTicket}
+              onSelect={openDetailsForTicket}
               onDirectionPreferenceChange={props.onGraphDirectionPreferenceChange}
               onShowCriticalPathChange={props.onShowCriticalPathChange}
               autoDirectionLabel={`Auto (${props.graphDirection === 'tb' ? 'Top → bottom' : 'Left → right'})`}
             />
           ) : null}
 
-          {props.tab === 'kanban' ? <KanbanView tickets={props.filteredTickets} selectedId={props.selectedId} onSelect={props.onSelectTicket} /> : null}
+          {props.tab === 'kanban' ? <KanbanView tickets={props.filteredTickets} selectedId={props.selectedId} onSelect={showSelectedTicketInDetails} /> : null}
 
           {props.tab === 'details' ? (
             <section className="details-pane details-pane-mobile">
-              <DetailsView ticket={props.selectedTicket} ticketById={props.ticketById} onSelect={props.onSelectTicket} />
+              <DetailsView ticket={props.selectedTicket} ticketById={props.ticketById} onSelect={showSelectedTicketInDetails} />
             </section>
           ) : null}
         </div>
@@ -324,6 +335,11 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
 }
 
 function MobileAgentOverlay(props: WorkspaceLayoutProps) {
+  const handleClose = () => {
+    props.onTabChange(props.lastActiveWorkspaceTab)
+    props.onCloseAgentPanel()
+  }
+
   return (
     <AgentOverlay
       ticket={props.selectedTicket}
@@ -332,7 +348,9 @@ function MobileAgentOverlay(props: WorkspaceLayoutProps) {
       toolActivity={props.agentPanel.toolActivity}
       onSendPrompt={props.agentPanel.sendPrompt}
       onAbort={props.agentPanel.abort}
-      onClose={props.onCloseAgentPanel}
+      onClose={handleClose}
+      fullscreen={props.viewportMode === 'mobile'}
+      returnToLabel={props.lastActiveWorkspaceTab}
     />
   )
 }

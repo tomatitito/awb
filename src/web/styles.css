@@ -816,6 +816,10 @@ select:focus-visible {
   place-items: end center;
 }
 
+.agent-overlay-fullscreen {
+  place-items: stretch;
+}
+
 .agent-overlay-backdrop {
   position: absolute;
   inset: 0;
@@ -837,6 +841,14 @@ select:focus-visible {
   border: 1px solid var(--dim);
   border-bottom: 0;
   overflow: hidden;
+}
+
+.agent-overlay-fullscreen .agent-overlay-sheet {
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border: 0;
 }
 
 .agent-overlay-header {
@@ -957,7 +969,7 @@ select:focus-visible {
 
 .agent-transcript-entry-top,
 .agent-tool-item-top,
-.agent-composer-actions {
+.agent-run-controls {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -983,6 +995,14 @@ select:focus-visible {
 .agent-composer {
   display: grid;
   gap: 10px;
+}
+
+.agent-run-controls {
+  flex-wrap: wrap;
+}
+
+.agent-composer-note {
+  color: var(--dim);
 }
 
 .agent-composer textarea {
@@ -1018,6 +1038,23 @@ select:focus-visible {
 .details-pane-mobile {
   border-left: 0;
   max-height: none;
+  overflow: visible;
+}
+
+.viewport-mobile .details-pane-mobile {
+  padding-bottom: 16px;
+}
+
+.viewport-mobile .details-view {
+  padding: 12px;
+}
+
+.viewport-mobile .details-header {
+  flex-direction: column;
+}
+
+.viewport-mobile .meta-grid {
+  grid-template-columns: 1fr;
 }
 
 .details-view {
@@ -1247,6 +1284,18 @@ select:focus-visible {
   align-items: stretch;
 }
 
+.viewport-mobile .graph-legend {
+  position: sticky;
+  top: 0;
+  left: auto;
+  margin: 12px 12px 0;
+}
+
+.viewport-mobile .graph-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .viewport-mobile .graph-control-segment {
   display: grid;
   grid-template-columns: 1fr;
@@ -1426,6 +1475,11 @@ select:focus-visible {
     width: 100%;
     max-height: 100vh;
     border-radius: 0;
+  }
+
+  .agent-run-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .graph-canvas,

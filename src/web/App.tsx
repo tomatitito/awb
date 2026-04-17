@@ -16,6 +16,7 @@ import { useAgentPanel } from './useAgentPanel'
 export default function App() {
   const [data, setData] = useState<AppData | null>(null)
   const [tab, setTab] = useState<TabKey>('graph')
+  const [lastActiveWorkspaceTab, setLastActiveWorkspaceTab] = useState<TabKey>('graph')
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [search, setSearch] = useState('')
   const [hideClosed, setHideClosed] = useState(false)
@@ -73,6 +74,12 @@ export default function App() {
 
   const filteredTickets = useMemo(() => baseTickets.filter((ticket) => matchesSearch(ticket, search)), [baseTickets, search])
   const selectedTicket = data?.tickets.find((ticket) => ticket.id === selectedId)
+
+  useEffect(() => {
+    if (!isAgentPanelOpen) {
+      setLastActiveWorkspaceTab(tab)
+    }
+  }, [isAgentPanelOpen, tab])
 
   const visibleTickets = useMemo(
     () => getVisibleTickets(filteredTickets, selectedTicket, sidebarFilters),
@@ -141,6 +148,7 @@ export default function App() {
       showCriticalPath={showCriticalPath}
       onShowCriticalPathChange={setShowCriticalPath}
       isAgentPanelOpen={isAgentPanelOpen}
+      lastActiveWorkspaceTab={lastActiveWorkspaceTab}
       onToggleAgentPanel={() => setIsAgentPanelOpen((current) => !current)}
       onCloseAgentPanel={() => setIsAgentPanelOpen(false)}
       agentPanel={{
