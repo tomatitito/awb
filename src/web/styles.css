@@ -81,10 +81,17 @@ select:focus-visible {
   background: var(--body-bg);
 }
 
+.viewport-mobile.app-shell {
+  grid-template-rows: auto 1fr;
+}
+
 .topbar,
+.mobile-header,
 .stats-row,
+.mobile-stats-row,
 .tabs,
 .tabs-nav,
+.mobile-tabs-nav,
 .graph-canvas,
 .ticket-sidebar,
 .ticket-sidebar-header,
@@ -141,6 +148,60 @@ select:focus-visible {
   flex-wrap: wrap;
 }
 
+.mobile-header {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--dim);
+}
+
+.mobile-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mobile-header-branding {
+  min-width: 0;
+}
+
+.mobile-header h1 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-agent-button {
+  min-height: 40px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+
+.mobile-header-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-header-controls input {
+  width: 100%;
+  min-height: 40px;
+  background: var(--body-bg);
+  color: var(--text);
+  border: 1px solid var(--dim);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.mobile-hide-closed-toggle {
+  min-height: 40px;
+  padding: 0 2px;
+}
+
 .toolbar input {
   width: 320px;
   max-width: 100%;
@@ -173,6 +234,12 @@ select:focus-visible {
   min-width: 0;
 }
 
+.mobile-tabs-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .stats-row {
   display: flex;
   justify-content: flex-end;
@@ -181,6 +248,14 @@ select:focus-visible {
   font-size: 10px;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.mobile-stats-row {
+  display: flex;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 10px;
+  flex-wrap: wrap;
 }
 
 .stats-row span {
@@ -197,6 +272,7 @@ select:focus-visible {
 }
 
 .tabs-nav button,
+.mobile-tabs-nav button,
 .ticket-link {
   background: transparent;
   color: var(--muted);
@@ -207,14 +283,21 @@ select:focus-visible {
 }
 
 .tabs-nav button:hover,
+.mobile-tabs-nav button:hover,
 .ticket-link:hover {
   color: var(--text);
 }
 
-.tabs-nav button.active {
+.tabs-nav button.active,
+.mobile-tabs-nav button.active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--body-bg);
+}
+
+.mobile-tabs-nav button {
+  min-height: 44px;
+  padding: 10px 8px;
 }
 
 .content {
@@ -226,6 +309,11 @@ select:focus-visible {
 
 .content-with-agent-panel {
   grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.viewport-mobile .content,
+.viewport-tablet .content {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .content-workspace {
@@ -245,6 +333,11 @@ select:focus-visible {
 
 .split-view-details {
   grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.split-view-tablet,
+.split-view-tablet-details {
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 .ticket-sidebar {
@@ -453,6 +546,10 @@ select:focus-visible {
   color: var(--body-bg);
 }
 
+.graph-control-segment button:first-child {
+  min-width: 84px;
+}
+
 .graph-toggle {
   color: var(--muted);
 }
@@ -503,6 +600,14 @@ select:focus-visible {
 .graph-empty-state {
   min-height: calc(100vh - 176px);
   height: calc(100vh - 176px);
+}
+
+.viewport-mobile .graph-canvas,
+.viewport-mobile .graph-empty-state,
+.viewport-tablet .graph-canvas,
+.viewport-tablet .graph-empty-state {
+  min-height: min(70vh, 720px);
+  height: min(70vh, 720px);
 }
 
 .graph-canvas {
@@ -703,6 +808,57 @@ select:focus-visible {
   top: 0;
 }
 
+.agent-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: end center;
+}
+
+.agent-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.agent-overlay-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 760px);
+  max-height: min(92vh, 980px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--container-bg);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  border: 1px solid var(--dim);
+  border-bottom: 0;
+  overflow: hidden;
+}
+
+.agent-overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--dim);
+  background: var(--container-bg);
+}
+
+.agent-overlay-header strong {
+  color: var(--warning);
+}
+
+.agent-overlay .agent-panel {
+  border-left: 0;
+  max-height: none;
+  position: static;
+}
+
 .agent-panel-header {
   display: flex;
   justify-content: space-between;
@@ -857,6 +1013,11 @@ select:focus-visible {
 
 .details-pane-full {
   border-left: 1px solid var(--dim);
+}
+
+.details-pane-mobile {
+  border-left: 0;
+  max-height: none;
 }
 
 .details-view {
@@ -1072,6 +1233,34 @@ select:focus-visible {
   padding: 10px;
 }
 
+.viewport-mobile .kanban-board {
+  padding: 12px;
+  scroll-snap-type: x proximity;
+}
+
+.viewport-mobile .kanban-column {
+  min-width: min(85vw, 320px);
+  scroll-snap-align: start;
+}
+
+.viewport-mobile .graph-controls {
+  align-items: stretch;
+}
+
+.viewport-mobile .graph-control-segment {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.viewport-mobile .graph-controls button {
+  border-right: 0;
+  border-bottom: 1px solid var(--dim);
+}
+
+.viewport-mobile .graph-controls button:last-child {
+  border-bottom: 0;
+}
+
 .kanban-column header {
   display: flex;
   justify-content: space-between;
@@ -1169,6 +1358,11 @@ select:focus-visible {
   .split-view-graph {
     grid-template-columns: 240px minmax(0, 1fr) 360px;
   }
+
+  .split-view-tablet,
+  .split-view-tablet-details {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
@@ -1181,6 +1375,14 @@ select:focus-visible {
   }
 
   .toolbar input {
+    width: 100%;
+  }
+
+  .mobile-header-top {
+    flex-direction: column;
+  }
+
+  .mobile-agent-button {
     width: 100%;
   }
 
@@ -1201,9 +1403,7 @@ select:focus-visible {
     justify-content: flex-start;
   }
 
-  .content-with-agent-panel,
-  .split-view-graph,
-  .split-view-details {
+  .content-with-agent-panel {
     grid-template-columns: 1fr;
   }
 
@@ -1215,6 +1415,17 @@ select:focus-visible {
     border-right: 0;
     border-left: 0;
     border-bottom: 1px solid var(--dim);
+  }
+
+  .split-view-tablet,
+  .split-view-tablet-details {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-overlay-sheet {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
   }
 
   .graph-canvas,

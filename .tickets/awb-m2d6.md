@@ -1,6 +1,6 @@
 ---
 id: awb-m2d6
-status: open
+status: closed
 deps: [awb-hjm7]
 links: []
 created: 2026-04-17T20:55:42Z
@@ -10,7 +10,7 @@ assignee: Jens Kouros
 parent: awb-6iak
 tags: [ui, responsive, layout, mobile, navigation]
 ---
-# Implement mobile navigation and compact mobile header for AWB
+# [awb-m2d6] Implement mobile navigation and compact mobile header for AWB
 
 Implement the phone-first navigation shell for AWB after the viewport-aware layout architecture is in place. Add a mobile-specific header/navigation pattern that makes switching between the primary mobile views explicit and keeps secondary controls accessible without reusing the desktop toolbar unchanged.
 
