@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { AgentPanel } from './AgentPanel'
 import type { AppData, DerivedTicket } from '../core/types'
 import { deriveVisibleGraph, type VisibleGraphDerivation } from '../core/graph'
 import {
@@ -647,6 +648,7 @@ export default function App() {
   const [sidebarFilters, setSidebarFilters] = useState<SidebarFilters>(() => createDefaultSidebarFilters())
   const [graphDirection, setGraphDirection] = useState<GraphDirection>('lr')
   const [showCriticalPath, setShowCriticalPath] = useState(true)
+  const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false)
   const hasLoadedOnceRef = useRef(false)
 
   useEffect(() => {
@@ -731,6 +733,14 @@ export default function App() {
             <input type="checkbox" checked={hideClosed} onChange={(event) => setHideClosed(event.target.checked)} />
             hide closed
           </label>
+          <button
+            type="button"
+            className={`secondary-button ${isAgentPanelOpen ? 'active' : ''}`}
+            aria-pressed={isAgentPanelOpen}
+            onClick={() => setIsAgentPanelOpen((current) => !current)}
+          >
+            {isAgentPanelOpen ? 'Hide agent panel' : 'Show agent panel'}
+          </button>
         </div>
       </header>
 
@@ -748,7 +758,7 @@ export default function App() {
         <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')} type="button">Details</button>
       </nav>
 
-      <main className="content">
+      <main className={`content ${isAgentPanelOpen ? 'content-with-agent-panel' : ''}`}>
         <div className="content-workspace">
           {tab === 'graph' ? (
             <div className="split-view split-view-graph">
@@ -830,6 +840,7 @@ export default function App() {
           ) : null}
         </div>
 
+        {isAgentPanelOpen ? <AgentPanel ticket={selectedTicket} tab={tab} ticketCount={visibleTickets.length} /> : null}
       </main>
     </div>
   )
