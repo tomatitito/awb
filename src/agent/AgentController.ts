@@ -86,7 +86,7 @@ export class AgentController {
     await this.ensureStarted()
     if (!this.session) return
     await this.session.abort()
-    this.refreshState(this.state.lastError ? 'error' : 'ready')
+    this.refreshState(this.state.lastError ? 'error' : 'ready', { isStreaming: false })
   }
 
   dispose(): void {
@@ -110,28 +110,33 @@ export class AgentController {
     this.emit({ type: 'agent-state', state: this.state })
   }
 
-  private refreshState(statusOverride?: AgentPanelState['status']): void {
+  private refreshState(
+    statusOverride?: AgentPanelState['status'],
+    stateOverride: Partial<AgentPanelState> = {},
+  ): void {
     const session = this.session
     if (!session) return
 
+    const isStreaming = stateOverride.isStreaming ?? session.isStreaming
     const model = session.model
     this.updateState({
-      status: statusOverride ?? (session.isStreaming ? 'running' : this.state.lastError ? 'error' : 'ready'),
+      status: statusOverride ?? (isStreaming ? 'running' : this.state.lastError ? 'error' : 'ready'),
       sessionId: session.sessionId,
       sessionFile: session.sessionFile,
       model: model ? { provider: model.provider, id: model.id } : undefined,
       selectedTicketId: this.selectedTicket?.ticketId,
-      isStreaming: session.isStreaming,
+      isStreaming,
+      ...stateOverride,
     })
   }
 
   private handleSessionEvent(event: AgentSessionEvent): void {
     switch (event.type) {
       case 'agent_start':
-        this.refreshState('running')
+        this.refreshState('running', { isStreaming: true })
         return
       case 'agent_end':
-        this.refreshState(this.state.lastError ? 'error' : 'ready')
+        this.refreshState(this.state.lastError ? 'error' : 'ready', { isStreaming: false })
         return
       case 'queue_update':
         this.updateState({

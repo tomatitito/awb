@@ -17,6 +17,7 @@ type TabKey = 'graph' | 'kanban' | 'details'
 type GraphDirection = 'lr' | 'tb'
 
 const STATUS_ORDER = ['open', 'in progress', 'closed', 'todo', 'blocked', 'review']
+const KANBAN_COLUMN_ORDER = ['backlog', 'open', 'in progress', 'closed']
 
 const TOKENS = {
   accent: '#10a37f',
@@ -375,13 +376,29 @@ function KanbanView({
 }) {
   const grouped = useMemo(() => {
     const map = new Map<string, DerivedTicket[]>()
-    for (const ticket of tickets) {
-      const status = ticket.status || 'unknown'
-      const items = map.get(status) ?? []
-      items.push(ticket)
-      map.set(status, items)
+
+    for (const column of KANBAN_COLUMN_ORDER) {
+      map.set(column, [])
     }
-    return Array.from(map.entries()).sort(([a], [b]) => compareStatuses(a, b))
+
+    for (const ticket of tickets) {
+      const normalizedStatus = normalizeStatus(ticket.status)
+      const column = normalizedStatus === 'open' && !ticket.ready
+        ? 'backlog'
+        : ticket.status || 'unknown'
+      const items = map.get(column) ?? []
+      items.push(ticket)
+      map.set(column, items)
+    }
+
+    const orderedEntries = KANBAN_COLUMN_ORDER
+      .map((column) => [column, map.get(column) ?? []] as const)
+
+    const extraEntries = Array.from(map.entries())
+      .filter(([column]) => !KANBAN_COLUMN_ORDER.includes(normalizeStatus(column)))
+      .sort(([a], [b]) => compareStatuses(a, b))
+
+    return [...orderedEntries, ...extraEntries]
   }, [tickets])
 
   return (
@@ -756,19 +773,20 @@ export default function App() {
         </div>
       </header>
 
-      <div className="stats-row">
-        <span>Total: {data.stats.total}</span>
-        <span>Open: {data.stats.open}</span>
-        <span>Closed: {data.stats.closed}</span>
-        <span>Ready: {data.stats.ready}</span>
-        {data.graph.hasCycle ? <span className="stats-warning">Dependency cycle detected</span> : <span>Critical path: {data.graph.criticalPath.length} edges</span>}
+      <div className="tabs">
+        <nav className="tabs-nav" aria-label="Views">
+          <button className={tab === 'graph' ? 'active' : ''} onClick={() => setTab('graph')} type="button">Graph</button>
+          <button className={tab === 'kanban' ? 'active' : ''} onClick={() => setTab('kanban')} type="button">Kanban</button>
+          <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')} type="button">Details</button>
+        </nav>
+        <div className="stats-row">
+          <span>Total: {data.stats.total}</span>
+          <span>Open: {data.stats.open}</span>
+          <span>Closed: {data.stats.closed}</span>
+          <span>Ready: {data.stats.ready}</span>
+          {data.graph.hasCycle ? <span className="stats-warning">Dependency cycle detected</span> : <span>Critical path: {data.graph.criticalPath.length} edges</span>}
+        </div>
       </div>
-
-      <nav className="tabs">
-        <button className={tab === 'graph' ? 'active' : ''} onClick={() => setTab('graph')} type="button">Graph</button>
-        <button className={tab === 'kanban' ? 'active' : ''} onClick={() => setTab('kanban')} type="button">Kanban</button>
-        <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')} type="button">Details</button>
-      </nav>
 
       <main className={`content ${isAgentPanelOpen ? 'content-with-agent-panel' : ''}`}>
         <div className="content-workspace">

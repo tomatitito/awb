@@ -70,6 +70,16 @@ Operational assumptions:
 
 The browser only receives serialized agent state and incremental SSE events. It does not access raw pi SDK objects directly.
 
+Implementation notes:
+
+- `src/agent/createPiSession.ts` creates one embedded pi session using the project directory as `cwd`
+- `src/agent/AgentController.ts` owns panel state, selected-ticket context, prompt submission, aborts, and pi event mapping
+- `src/server.ts` exposes `/api/agent/state`, `/api/agent/events`, `/api/agent/context`, `/api/agent/prompt`, and `/api/agent/abort`
+- `src/web/useAgentPanel.ts` keeps the React state in sync over SSE and incremental event updates
+- `src/web/AgentPanel.tsx` renders the context summary, transcript, tool activity, and prompt composer
+
+See [`wiki/agent-panel-architecture.md`](./wiki/agent-panel-architecture.md) for the detailed architecture and follow-up workflow roadmap.
+
 ## Ticket format
 
 `awb` expects Markdown files in `.tickets/` with frontmatter like:

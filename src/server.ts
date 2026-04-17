@@ -174,7 +174,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     closeWebDevServer = () => vite.close()
 
     app.use(vite.middlewares)
-    app.get('*', async (request, response, next) => {
+    app.get('/{*splat}', async (request, response, next) => {
       try {
         const indexPath = path.join(webRoot, 'index.html')
         const template = await fsp.readFile(indexPath, 'utf8')
@@ -187,7 +187,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     })
   } else {
     app.use(express.static(webDir))
-    app.get('*', (_request, response) => {
+    app.get('/{*splat}', (_request, response) => {
       response.sendFile(path.join(webDir, 'index.html'))
     })
   }
