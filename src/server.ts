@@ -5,8 +5,8 @@ import path from 'node:path'
 import type { ServerResponse } from 'node:http'
 import type { Server } from 'node:http'
 import { fileURLToPath } from 'node:url'
-import { AgentController } from './agent/AgentController.js'
-import type { AgentPanelEvent, SelectedTicketContext } from './agent/types.js'
+import { AgentController, toLegacyPanelEvent } from './agent/AgentController.js'
+import type { AgentRunEvent, SelectedTicketContext } from './agent/types.js'
 import { loadTickets } from './core/loadTickets.js'
 
 export type StartServerOptions = {
@@ -25,7 +25,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   const absoluteTicketsDir = path.resolve(options.projectDir, options.ticketsDir)
   let data = await loadTickets(options.projectDir, options.ticketsDir)
   const liveReloadClients = new Set<ServerResponse>()
-  const agentClients = new Set<ServerResponse>()
+  const legacyAgentClients = new Set<ServerResponse>()
+  const allRunClients = new Set<ServerResponse>()
+  const runClients = new Map<string, Set<ServerResponse>>()
   const agentController = new AgentController(options.projectDir)
   let reloadTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -71,15 +73,43 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     response.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`)
   }
 
-  const broadcastAgentEvent = (event: AgentPanelEvent) => {
-    for (const client of agentClients) {
+  const broadcastRunEvent = (event: AgentRunEvent) => {
+    for (const client of allRunClients) {
       writeSseEvent(client, event.type, event)
+    }
+    if ('runId' in event) {
+      for (const client of runClients.get(event.runId) ?? []) {
+        writeSseEvent(client, event.type, event)
+      }
+    }
+    if ('run' in event) {
+      for (const client of runClients.get(event.run.id) ?? []) {
+        writeSseEvent(client, event.type, event)
+      }
+    }
+
+    const legacyEvent = toLegacyPanelEvent(event)
+    if (legacyEvent) {
+      for (const client of legacyAgentClients) {
+        writeSseEvent(client, legacyEvent.type, legacyEvent)
+      }
     }
   }
 
   const unsubscribeAgent = agentController.subscribe((event) => {
-    broadcastAgentEvent(event)
+    broadcastRunEvent(event)
   })
+
+  const getTicketContext = (ticketId: string) => {
+    const ticket = data.tickets.find((entry) => entry.id === ticketId)
+    if (!ticket) return undefined
+    return {
+      ticketId: ticket.id,
+      title: ticket.title,
+      body: ticket.body,
+      filePath: ticket.filePath,
+    }
+  }
 
   app.get('/api/tickets', (_request, response) => {
     response.json(data)
@@ -98,23 +128,120 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     })
   })
 
-  app.get('/api/agent/state', async (_request, response) => {
-    await agentController.ensureStarted()
-    response.json(agentController.getState())
+  app.get('/api/agent/runs', (_request, response) => {
+    response.json({ runs: agentController.listRuns() })
   })
 
-  app.get('/api/agent/events', async (request, response) => {
+  app.post('/api/agent/runs', async (request, response) => {
+    const ticketId = typeof request.body?.ticketId === 'string' ? request.body.ticketId.trim() : ''
+    if (!ticketId) {
+      response.status(400).json({ message: 'ticketId is required.' })
+      return
+    }
+
+    const ticket = getTicketContext(ticketId)
+    if (!ticket) {
+      response.status(404).json({ message: `Ticket ${ticketId} was not found.` })
+      return
+    }
+
+    const run = await agentController.createRun(ticket)
+    response.status(201).json({ run })
+  })
+
+  app.get('/api/agent/runs/events', (_request, response) => {
     response.setHeader('Content-Type', 'text/event-stream')
     response.setHeader('Cache-Control', 'no-cache, no-transform')
     response.setHeader('Connection', 'keep-alive')
     response.flushHeaders()
+    writeSseEvent(response, 'ready', { type: 'ready', runs: agentController.listRuns() })
 
-    await agentController.ensureStarted()
+    allRunClients.add(response)
+    _request.on('close', () => {
+      allRunClients.delete(response)
+    })
+  })
+
+  app.get('/api/agent/runs/:runId', (request, response) => {
+    const run = agentController.getRun(request.params.runId)
+    if (!run) {
+      response.status(404).json({ message: `Run ${request.params.runId} was not found.` })
+      return
+    }
+
+    response.json({ run })
+  })
+
+  app.get('/api/agent/runs/:runId/events', (request, response) => {
+    const run = agentController.getRun(request.params.runId)
+    if (!run) {
+      response.status(404).json({ message: `Run ${request.params.runId} was not found.` })
+      return
+    }
+
+    response.setHeader('Content-Type', 'text/event-stream')
+    response.setHeader('Cache-Control', 'no-cache, no-transform')
+    response.setHeader('Connection', 'keep-alive')
+    response.flushHeaders()
+    writeSseEvent(response, 'ready', { type: 'ready', run })
+
+    let clients = runClients.get(run.id)
+    if (!clients) {
+      clients = new Set()
+      runClients.set(run.id, clients)
+    }
+    clients.add(response)
+
+    request.on('close', () => {
+      clients?.delete(response)
+      if (clients && clients.size === 0) {
+        runClients.delete(run.id)
+      }
+    })
+  })
+
+  app.post('/api/agent/runs/:runId/prompt', async (request, response) => {
+    const text = typeof request.body?.text === 'string' ? request.body.text.trim() : ''
+    if (!text) {
+      response.status(400).json({ message: 'Prompt text is required.' })
+      return
+    }
+
+    try {
+      await agentController.promptRun(request.params.runId, text)
+      response.status(202).json({ ok: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const status = message.includes('not found') ? 404 : 409
+      response.status(status).json({ message })
+    }
+  })
+
+  app.post('/api/agent/runs/:runId/abort', async (request, response) => {
+    try {
+      await agentController.abortRun(request.params.runId)
+      response.status(202).json({ ok: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const status = message.includes('not found') ? 404 : 409
+      response.status(status).json({ message })
+    }
+  })
+
+  app.get('/api/agent/state', (_request, response) => {
+    response.json(agentController.getState())
+  })
+
+  app.get('/api/agent/events', (_request, response) => {
+    response.setHeader('Content-Type', 'text/event-stream')
+    response.setHeader('Cache-Control', 'no-cache, no-transform')
+    response.setHeader('Connection', 'keep-alive')
+    response.flushHeaders()
     writeSseEvent(response, 'ready', { type: 'ready', state: agentController.getState() })
 
-    agentClients.add(response)
-    request.on('close', () => {
-      agentClients.delete(response)
+    legacyAgentClients.add(response)
+    _request.on('close', () => {
+      legacyAgentClients.delete(response)
     })
   })
 
@@ -207,11 +334,21 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     for (const client of liveReloadClients) {
       client.end()
     }
-    for (const client of agentClients) {
+    for (const client of legacyAgentClients) {
       client.end()
     }
+    for (const client of allRunClients) {
+      client.end()
+    }
+    for (const clients of runClients.values()) {
+      for (const client of clients) {
+        client.end()
+      }
+    }
     liveReloadClients.clear()
-    agentClients.clear()
+    legacyAgentClients.clear()
+    allRunClients.clear()
+    runClients.clear()
   })
 
   const address = server.address()

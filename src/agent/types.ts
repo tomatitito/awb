@@ -1,11 +1,69 @@
 export type AgentPanelStatus = 'idle' | 'connecting' | 'ready' | 'running' | 'error'
 
-export type SelectedTicketContext = {
+export type TicketRunContext = {
   ticketId: string
   title: string
   body: string
   filePath: string
 }
+
+export type SelectedTicketContext = TicketRunContext
+
+export type AgentRunStatus = 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'aborted'
+
+export type AgentRunTranscriptEntry = {
+  id: string
+  role: 'user' | 'assistant' | 'error'
+  text: string
+  timestamp: number
+  isStreaming?: boolean
+  errorMessage?: string
+}
+
+export type AgentToolActivityEntry = {
+  toolCallId: string
+  toolName: string
+  startedAt: number
+  completedAt?: number
+  args?: unknown
+  result?: unknown
+  isError?: boolean
+}
+
+export type AgentRunState = {
+  id: string
+  ticket: TicketRunContext
+  status: AgentRunStatus
+  createdAt: number
+  startedAt?: number
+  completedAt?: number
+  abortedAt?: number
+  updatedAt: number
+  initialPrompt: string
+  transcript: AgentRunTranscriptEntry[]
+  toolActivity: AgentToolActivityEntry[]
+  queuedSteeringCount: number
+  queuedFollowUpCount: number
+  sessionId?: string
+  sessionFile?: string
+  model?: {
+    provider: string
+    id: string
+  }
+  lastError?: string
+  worktree?: {
+    path?: string
+    branch?: string
+    baseRef?: string
+  }
+}
+
+export type AgentRunEvent =
+  | { type: 'run-created'; run: AgentRunState }
+  | { type: 'run-updated'; run: AgentRunState }
+  | { type: 'run-output'; runId: string; entry: AgentRunTranscriptEntry }
+  | { type: 'tool-activity'; runId: string; tool: AgentToolActivityEntry }
+  | { type: 'error'; runId: string; message: string }
 
 export type AgentPanelState = {
   status: AgentPanelStatus
