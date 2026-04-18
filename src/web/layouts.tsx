@@ -89,6 +89,9 @@ function WorkspaceChrome({
   onToggleAgentPanel,
   dataStats,
   graphSummary,
+  epicTickets,
+  sidebarFilters,
+  onSidebarFiltersChange,
 }: Pick<WorkspaceLayoutProps,
   | 'viewportMode'
   | 'projectDir'
@@ -102,6 +105,9 @@ function WorkspaceChrome({
   | 'onToggleAgentPanel'
   | 'dataStats'
   | 'graphSummary'
+  | 'epicTickets'
+  | 'sidebarFilters'
+  | 'onSidebarFiltersChange'
 > & { children: ReactNode }) {
   const agentToggleLabel = viewportMode === 'desktop'
     ? (isAgentPanelOpen ? 'Hide agent panel' : 'Show agent panel')
@@ -127,6 +133,9 @@ function WorkspaceChrome({
           ready={dataStats.ready}
           hasCycle={graphSummary.hasCycle}
           criticalPathLength={graphSummary.criticalPathLength}
+          epics={epicTickets}
+          filters={sidebarFilters}
+          onFiltersChange={onSidebarFiltersChange}
         />
       ) : (
         <>

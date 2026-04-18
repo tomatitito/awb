@@ -187,7 +187,8 @@ select:focus-visible {
   gap: 10px;
 }
 
-.mobile-header-controls input {
+.mobile-header-controls input,
+.mobile-epic-filter-group select {
   width: 100%;
   min-height: 40px;
   background: var(--body-bg);
@@ -195,6 +196,21 @@ select:focus-visible {
   border: 1px solid var(--dim);
   border-radius: 6px;
   padding: 8px 10px;
+}
+
+.mobile-epic-filter-group {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-epic-filter-group label {
+  color: var(--warning);
+  font-size: 10px;
+}
+
+.mobile-epic-filter-summary {
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .mobile-hide-closed-toggle {

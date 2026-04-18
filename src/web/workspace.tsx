@@ -68,6 +68,44 @@ function getEpicLabel(ticket: DerivedTicket, ticketById: Map<string, DerivedTick
   return epic ? `Epic ${epic.id}` : `Epic ${ticket.parent}`
 }
 
+function getEpicFilterOptionLabel(epicId: string, epics: DerivedTicket[]): string {
+  if (!epicId) return 'All tickets'
+  if (epicId === UNGROUPED_EPIC_FILTER) return 'Without epic'
+  const epic = epics.find((candidate) => candidate.id === epicId)
+  return epic ? `${epic.id} — ${epic.title}` : `Epic ${epicId}`
+}
+
+function EpicFilterSelect({
+  epics,
+  filters,
+  onFiltersChange,
+  id,
+  dataAwb,
+}: {
+  epics: DerivedTicket[]
+  filters: SidebarFilters
+  onFiltersChange: (filters: SidebarFilters) => void
+  id: string
+  dataAwb?: string
+}) {
+  return (
+    <select
+      id={id}
+      data-awb={dataAwb}
+      value={filters.epicId}
+      onChange={(event) => onFiltersChange({ ...filters, epicId: event.target.value })}
+    >
+      <option value="">All tickets</option>
+      <option value={UNGROUPED_EPIC_FILTER}>Without epic</option>
+      {epics.map((epic) => (
+        <option key={epic.id} value={epic.id}>
+          {epic.id} — {epic.title}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 export function WorkspaceTopBar({
   projectDir,
   search,
@@ -209,6 +247,9 @@ export function MobileWorkspaceHeader({
   ready,
   hasCycle,
   criticalPathLength,
+  epics,
+  filters,
+  onFiltersChange,
 }: {
   projectDir: string
   search: string
@@ -226,6 +267,9 @@ export function MobileWorkspaceHeader({
   ready: number
   hasCycle: boolean
   criticalPathLength: number
+  epics: DerivedTicket[]
+  filters: SidebarFilters
+  onFiltersChange: (filters: SidebarFilters) => void
 }) {
   return (
     <header className="mobile-header">
@@ -247,6 +291,17 @@ export function MobileWorkspaceHeader({
 
       <div className="mobile-header-controls">
         <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search id or title" />
+        <div className="mobile-epic-filter-group">
+          <label htmlFor="mobile-epic-filter">Epic scope</label>
+          <EpicFilterSelect
+            epics={epics}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            id="mobile-epic-filter"
+            dataAwb="mobile-epic-filter"
+          />
+          <div className="mobile-epic-filter-summary">Current: {getEpicFilterOptionLabel(filters.epicId, epics)}</div>
+        </div>
         <label className="checkbox mobile-hide-closed-toggle">
           <input type="checkbox" checked={hideClosed} onChange={(event) => onHideClosedChange(event.target.checked)} />
           hide closed
@@ -720,19 +775,7 @@ export function TicketSidebar({
       <div className="ticket-sidebar-filters">
         <div className="ticket-sidebar-filter-group">
           <label htmlFor="epic-filter">Epic</label>
-          <select
-            id="epic-filter"
-            value={filters.epicId}
-            onChange={(event) => onFiltersChange({ ...filters, epicId: event.target.value })}
-          >
-            <option value="">All tickets</option>
-            <option value={UNGROUPED_EPIC_FILTER}>Without epic</option>
-            {epics.map((epic) => (
-              <option key={epic.id} value={epic.id}>
-                {epic.id} — {epic.title}
-              </option>
-            ))}
-          </select>
+          <EpicFilterSelect epics={epics} filters={filters} onFiltersChange={onFiltersChange} id="epic-filter" />
         </div>
 
         <div className="ticket-sidebar-filter-group">
