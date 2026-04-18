@@ -18,6 +18,7 @@ import {
   type GraphDirection,
   type TabKey,
 } from './workspace'
+import { closeMobileAgentOverlay, openMobileDetailsForTicket } from './mobileFlow'
 
 export type WorkspaceLayoutProps = {
   viewportMode: ViewportMode
@@ -290,13 +291,15 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
 
 function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
   const openDetailsForTicket = (id: string) => {
-    props.onSelectTicket(id)
-    props.onTabChange('details')
+    const next = openMobileDetailsForTicket(id)
+    props.onSelectTicket(next.selectedId)
+    props.onTabChange(next.tab)
   }
 
   const showSelectedTicketInDetails = (id: string) => {
-    props.onSelectTicket(id)
-    props.onTabChange('details')
+    const next = openMobileDetailsForTicket(id)
+    props.onSelectTicket(next.selectedId)
+    props.onTabChange(next.tab)
   }
 
   return (
@@ -336,7 +339,11 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
 
 function MobileAgentOverlay(props: WorkspaceLayoutProps) {
   const handleClose = () => {
-    props.onTabChange(props.lastActiveWorkspaceTab)
+    const next = closeMobileAgentOverlay({
+      isAgentPanelOpen: props.isAgentPanelOpen,
+      lastActiveWorkspaceTab: props.lastActiveWorkspaceTab,
+    })
+    props.onTabChange(next.tab)
     props.onCloseAgentPanel()
   }
 

@@ -44,7 +44,7 @@ export function AgentPanel({
   const toolSummary = useMemo(() => toolActivity.slice(-6).reverse(), [toolActivity])
 
   return (
-    <aside className="agent-panel" aria-label="Agent panel">
+    <aside className="agent-panel" aria-label="Agent panel" data-awb="agent-panel" data-agent-status={state.status} data-agent-streaming={state.isStreaming ? 'true' : 'false'}>
       <div className="agent-panel-header">
         <div>
           <strong>Agent panel</strong>
@@ -138,11 +138,12 @@ export function AgentPanel({
           rows={5}
         />
         <div className="agent-run-controls" aria-label="Agent execution controls">
-          <button type="submit" className="primary-button" disabled={state.status === 'connecting' || state.isStreaming}>
+          <button type="submit" data-awb="agent-send" className="primary-button" disabled={state.status === 'connecting' || state.isStreaming}>
             Send
           </button>
           <button
             type="button"
+            data-awb="agent-stop"
             className="secondary-button"
             disabled={!state.isStreaming}
             onClick={() => {
@@ -156,6 +157,7 @@ export function AgentPanel({
           </button>
           <button
             type="button"
+            data-awb="agent-pause"
             className="secondary-button"
             disabled
             title={PAUSE_UNAVAILABLE_REASON}

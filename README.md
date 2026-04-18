@@ -98,6 +98,25 @@ tags: [architecture, tooling]
 Ticket body here.
 ```
 
+## Mobile regression hooks
+
+AWB exposes stable `data-awb` selectors so mobile regression flows can target responsive Graph, Details, and Agent interactions without depending on CSS classes.
+
+Current mobile-focused selectors include:
+
+- `data-awb="mobile-agent-toggle"`
+- `data-awb="tab-graph"`
+- `data-awb="tab-kanban"`
+- `data-awb="tab-details"`
+- `data-awb="graph-ticket-card"` with `data-ticket-id="<ticket-id>"`
+- `data-awb="details-view"` with `data-selected-ticket-id="<ticket-id>"`
+- `data-awb="agent-overlay"`
+- `data-awb="agent-overlay-close"`
+- `data-awb="agent-panel"` with `data-agent-status` and `data-agent-streaming`
+- `data-awb="agent-send"`, `data-awb="agent-stop"`, and `data-awb="agent-pause"`
+
+The current automated mobile regression coverage uses Bun tests for the mobile navigation flow semantics in `tests/web/mobileFlow.test.ts`. A Maestro flow can be layered on top of these selectors later without changing the UI contracts.
+
 ## Notes
 
 - This repo was bootstrapped by copying over the non-generated contents of `../tk-viewer`.

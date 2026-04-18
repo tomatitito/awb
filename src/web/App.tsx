@@ -11,6 +11,7 @@ import {
 import { ResponsiveWorkspaceLayout } from './layouts'
 import { useViewportMode } from './useViewportMode'
 import { compareStatuses, matchesSearch, type GraphDirection, type TabKey } from './workspace'
+import { openAgentPanelFromHeader } from './mobileFlow'
 import { useAgentPanel } from './useAgentPanel'
 
 export default function App() {
@@ -149,7 +150,16 @@ export default function App() {
       onShowCriticalPathChange={setShowCriticalPath}
       isAgentPanelOpen={isAgentPanelOpen}
       lastActiveWorkspaceTab={lastActiveWorkspaceTab}
-      onToggleAgentPanel={() => setIsAgentPanelOpen((current) => !current)}
+      onToggleAgentPanel={() => {
+        if (isAgentPanelOpen) {
+          setIsAgentPanelOpen(false)
+          return
+        }
+
+        const next = openAgentPanelFromHeader({ tab })
+        setLastActiveWorkspaceTab(next.lastActiveWorkspaceTab)
+        setIsAgentPanelOpen(next.isAgentPanelOpen)
+      }}
       onCloseAgentPanel={() => setIsAgentPanelOpen(false)}
       agentPanel={{
         state: agentPanel.state,

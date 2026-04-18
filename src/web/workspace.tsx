@@ -122,9 +122,9 @@ function WorkspaceViewTabs({
 }) {
   return (
     <nav className={className ?? 'tabs-nav'} aria-label="Views">
-      <button className={tab === 'graph' ? 'active' : ''} onClick={() => onTabChange('graph')} type="button">Graph</button>
-      <button className={tab === 'kanban' ? 'active' : ''} onClick={() => onTabChange('kanban')} type="button">Kanban</button>
-      <button className={tab === 'details' ? 'active' : ''} onClick={() => onTabChange('details')} type="button">Details</button>
+      <button data-awb="tab-graph" className={tab === 'graph' ? 'active' : ''} onClick={() => onTabChange('graph')} type="button">Graph</button>
+      <button data-awb="tab-kanban" className={tab === 'kanban' ? 'active' : ''} onClick={() => onTabChange('kanban')} type="button">Kanban</button>
+      <button data-awb="tab-details" className={tab === 'details' ? 'active' : ''} onClick={() => onTabChange('details')} type="button">Details</button>
     </nav>
   )
 }
@@ -235,6 +235,7 @@ export function MobileWorkspaceHeader({
         </div>
         <button
           type="button"
+          data-awb="mobile-agent-toggle"
           className={`secondary-button mobile-agent-button ${isAgentPanelOpen ? 'active' : ''}`}
           aria-pressed={isAgentPanelOpen}
           onClick={onToggleAgentPanel}
@@ -516,6 +517,7 @@ export function GraphView({
                 key={ticket.id}
                 type="button"
                 className={className}
+                data-awb="graph-ticket-card"
                 data-ticket-id={ticket.id}
                 style={{ left: node.x, top: node.y, width: GRAPH_CARD_WIDTH, height: GRAPH_CARD_HEIGHT }}
                 onClick={() => onSelect(ticket.id)}
@@ -869,7 +871,7 @@ export function DetailsView({
   if (!ticket) return <div className="empty-state">Select a ticket in Graph or Kanban to open its full details.</div>
 
   return (
-    <div className="details-view">
+    <div className="details-view" data-awb="details-view" data-selected-ticket-id={ticket.id}>
       <header className="details-header">
         <div>
           <h2>{ticket.title}</h2>
@@ -931,15 +933,16 @@ export function AgentOverlay({
   return (
     <div
       className={`agent-overlay ${fullscreen ? 'agent-overlay-fullscreen' : ''}`}
+      data-awb="agent-overlay"
       role="dialog"
       aria-modal="true"
       aria-label="Agent panel overlay"
     >
-      <button type="button" className="agent-overlay-backdrop" aria-label="Close agent panel" onClick={onClose} />
+      <button type="button" data-awb="agent-overlay-backdrop" className="agent-overlay-backdrop" aria-label="Close agent panel" onClick={onClose} />
       <div className="agent-overlay-sheet">
         <div className="agent-overlay-header">
           <strong>Agent</strong>
-          <button type="button" className="secondary-button" onClick={onClose}>{closeLabel}</button>
+          <button type="button" data-awb="agent-overlay-close" className="secondary-button" onClick={onClose}>{closeLabel}</button>
         </div>
         <AgentPanel
           ticket={ticket}
