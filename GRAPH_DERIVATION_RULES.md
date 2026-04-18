@@ -39,7 +39,8 @@ These rules define the dependency-first Graph mode semantics used by `awb`.
 
 - `hide closed` and sidebar filters determine which tickets are rendered.
 - Dependency layers are still derived from the full graph before filtering.
-- Filtered graph rendering keeps the original derived layer positions for visible tickets.
+- Filtered graph rendering preserves each visible ticket's derived layer.
+- After filtering, visible tickets are compacted within each layer so hidden tickets do not leave empty gaps in the rendered layout.
 - Rendered dependency edges are shown only when both endpoints are visible.
 - Critical-path highlighting is clipped to visible nodes and edges.
 

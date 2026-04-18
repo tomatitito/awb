@@ -322,6 +322,31 @@ export function deriveGraph(tickets: DerivedTicket[]): GraphDerivation {
   }
 }
 
+function compactVisibleNodes(nodes: GraphNodeLayout[]): GraphNodeLayout[] {
+  const layerGroups = new Map<number, GraphNodeLayout[]>()
+
+  for (const node of nodes) {
+    const group = layerGroups.get(node.layer) ?? []
+    group.push(node)
+    layerGroups.set(node.layer, group)
+  }
+
+  const compactedById = new Map<string, GraphNodeLayout>()
+  for (const [layer, group] of layerGroups) {
+    group
+      .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+      .forEach((node, order) => {
+        compactedById.set(node.id, {
+          ...node,
+          layer,
+          order,
+        })
+      })
+  }
+
+  return nodes.map((node) => compactedById.get(node.id) ?? node)
+}
+
 export function deriveVisibleGraph(
   graph: GraphDerivation,
   visibleTickets: DerivedTicket[],
@@ -342,7 +367,7 @@ export function deriveVisibleGraph(
   const selectedLinks = new Set(selectedTicket?.links ?? [])
   const selectedDependencies = new Set(selectedTicket?.blockedBy ?? [])
   const selectedDependents = new Set(selectedTicket?.unblocks ?? [])
-  const nodes = graph.nodes.filter((node) => visibleIds.has(node.id))
+  const nodes = compactVisibleNodes(graph.nodes.filter((node) => visibleIds.has(node.id)))
   const dependencyEdges = graph.dependencyEdges.filter(
     (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
   )

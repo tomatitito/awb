@@ -6,6 +6,7 @@ import type { VisibleGraphDerivation } from '../core/graph'
 import {
   createDefaultSidebarFilters,
   normalizeFilterValue,
+  UNGROUPED_EPIC_FILTER,
   type SidebarFilters,
 } from './filtering'
 import type { AgentPanelState } from '../agent/types'
@@ -725,6 +726,7 @@ export function TicketSidebar({
             onChange={(event) => onFiltersChange({ ...filters, epicId: event.target.value })}
           >
             <option value="">All tickets</option>
+            <option value={UNGROUPED_EPIC_FILTER}>Without epic</option>
             {epics.map((epic) => (
               <option key={epic.id} value={epic.id}>
                 {epic.id} — {epic.title}

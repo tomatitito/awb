@@ -130,7 +130,7 @@ describe('deriveVisibleGraph', () => {
     ])
   })
 
-  test('filters graph tickets to the selected epic, its children, and ungrouped tickets', () => {
+  test('filters graph tickets to the selected epic and its children', () => {
     const tickets = [
       ticket({ id: 'epic-a', type: 'epic' }),
       ticket({ id: 'epic-b', type: 'epic' }),
@@ -146,10 +146,41 @@ describe('deriveVisibleGraph', () => {
 
     const visible = deriveVisibleGraph(graph, visibleTickets)
 
-    expect(visible.nodes.map((node) => node.id)).toEqual(['epic-a', 'child-a', 'ungrouped'])
+    expect(visible.nodes).toEqual([
+      { id: 'epic-a', layer: 0, order: 0, critical: true },
+      { id: 'child-a', layer: 1, order: 0, critical: true },
+    ])
     expect(visible.dependencyEdges).toEqual([
-      { id: 'child-a->ungrouped', source: 'child-a', target: 'ungrouped', isCritical: true },
       { id: 'epic-a->child-a', source: 'epic-a', target: 'child-a', isCritical: true },
+    ])
+  })
+
+  test('compacts visible node order within each layer after filtering', () => {
+    const tickets = [
+      ticket({ id: 'task-a' }),
+      ticket({ id: 'task-b' }),
+      ticket({ id: 'task-c' }),
+      ticket({ id: 'task-d', blockedBy: ['task-a'] }),
+      ticket({ id: 'task-e', blockedBy: ['task-b'] }),
+      ticket({ id: 'task-f', blockedBy: ['task-c'] }),
+    ]
+    const graph = deriveGraph(tickets)
+
+    const visible = deriveVisibleGraph(graph, [tickets[0], tickets[2], tickets[3], tickets[5]])
+
+    expect(graph.nodes).toEqual([
+      { id: 'task-a', layer: 0, order: 0, critical: true },
+      { id: 'task-b', layer: 0, order: 1, critical: false },
+      { id: 'task-c', layer: 0, order: 2, critical: false },
+      { id: 'task-d', layer: 1, order: 0, critical: true },
+      { id: 'task-e', layer: 1, order: 1, critical: false },
+      { id: 'task-f', layer: 1, order: 2, critical: false },
+    ])
+    expect(visible.nodes).toEqual([
+      { id: 'task-a', layer: 0, order: 0, critical: true },
+      { id: 'task-c', layer: 0, order: 1, critical: false },
+      { id: 'task-d', layer: 1, order: 0, critical: true },
+      { id: 'task-f', layer: 1, order: 1, critical: false },
     ])
   })
 
