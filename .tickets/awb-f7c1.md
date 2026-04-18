@@ -21,7 +21,7 @@ For desktop, the run control may be hover/focus-revealed near the `ready` badge.
 - only ready tickets expose the run action
 - desktop may reveal the green play button on hover/focus near the `ready` badge
 - mobile shows the run button directly on ready cards
-- clicking the run button starts a background agent run for that ticket
+- clicking the run button starts a background agent run for that ticket using the default AWB initial prompt generated from the ticket content
 - launching a run does not open the existing agent panel
 - launching a run does not navigate away from the current view
 - after launch, the button becomes gray/disabled
@@ -32,6 +32,7 @@ For desktop, the run control may be hover/focus-revealed near the `ready` badge.
 - Graph and Kanban both surface a run action for ready tickets
 - only ready tickets expose the run action
 - clicking run creates a background run for that ticket
+- launching a run uses the default AWB initial prompt generated from the ticket content rather than requiring manual prompt entry
 - the current page and current tab remain unchanged after launch
 - the existing ticket selection behavior still works
 - after launch, the button visibly changes from green to gray/disabled
