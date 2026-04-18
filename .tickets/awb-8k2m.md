@@ -1,6 +1,6 @@
 ---
 id: awb-8k2m
-status: open
+status: closed
 deps: []
 links: [awb-3n5p]
 created: 2026-04-18T00:00:00Z
