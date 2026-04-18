@@ -1,6 +1,6 @@
 ---
 id: tv-dgrl
-status: open
+status: closed
 deps: [tv-rlnk]
 links: [tv-gd42, tv-layr, tv-cdsg]
 created: 2026-04-14T00:00:00Z

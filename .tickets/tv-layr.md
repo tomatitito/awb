@@ -1,6 +1,6 @@
 ---
 id: tv-layr
-status: open
+status: closed
 deps: [tv-rlnk, tv-dgrl]
 links: [tv-gd42, tv-y2q8, tv-x8xs]
 created: 2026-04-14T00:00:00Z

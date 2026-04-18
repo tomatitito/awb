@@ -6,7 +6,6 @@ links: [tv-fvrl, tv-la01, tv-7g4i, tv-w39i]
 created: 2026-04-13T09:13:59Z
 type: task
 priority: 2
-parent: tv-1mg4
 tags: [implementation-plan]
 ---
 # Add graceful empty and error states across the app

@@ -1,6 +1,6 @@
 ---
 id: tv-gd42
-status: open
+status: closed
 deps: []
 links: [tv-y2q8, tv-x8xs]
 created: 2026-04-14T00:00:00Z

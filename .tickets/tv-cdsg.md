@@ -1,6 +1,6 @@
 ---
 id: tv-cdsg
-status: open
+status: closed
 deps: [tv-layr]
 links: [tv-gd42, tv-layr, tv-rlnk]
 created: 2026-04-14T00:00:00Z
