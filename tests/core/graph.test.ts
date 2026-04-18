@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { deriveGraph, deriveVisibleGraph } from '../../src/core/graph.js'
 import type { DerivedTicket } from '../../src/core/types.js'
+import { createDefaultSidebarFilters, getVisibleTickets } from '../../src/web/filtering.js'
 
 function ticket(overrides: Partial<DerivedTicket> & Pick<DerivedTicket, 'id'>): DerivedTicket {
   return {
@@ -126,6 +127,29 @@ describe('deriveVisibleGraph', () => {
     expect(visible.relatedEdges).toEqual([
       { id: 'task-b~>task-d', source: 'task-b', target: 'task-d' },
       { id: 'task-b~>task-e', source: 'task-b', target: 'task-e' },
+    ])
+  })
+
+  test('filters graph tickets to the selected epic, its children, and ungrouped tickets', () => {
+    const tickets = [
+      ticket({ id: 'epic-a', type: 'epic' }),
+      ticket({ id: 'epic-b', type: 'epic' }),
+      ticket({ id: 'child-a', parent: 'epic-a', blockedBy: ['epic-a'] }),
+      ticket({ id: 'child-b', parent: 'epic-b', blockedBy: ['epic-b'] }),
+      ticket({ id: 'ungrouped', blockedBy: ['child-a'] }),
+    ]
+    const graph = deriveGraph(tickets)
+    const visibleTickets = getVisibleTickets(tickets, undefined, {
+      ...createDefaultSidebarFilters(),
+      epicId: 'epic-a',
+    })
+
+    const visible = deriveVisibleGraph(graph, visibleTickets)
+
+    expect(visible.nodes.map((node) => node.id)).toEqual(['epic-a', 'child-a', 'ungrouped'])
+    expect(visible.dependencyEdges).toEqual([
+      { id: 'child-a->ungrouped', source: 'child-a', target: 'ungrouped', isCritical: true },
+      { id: 'epic-a->child-a', source: 'epic-a', target: 'child-a', isCritical: true },
     ])
   })
 

@@ -5,6 +5,7 @@ import {
   createDefaultSidebarFilters,
   getAvailableStatuses,
   getEpicTickets,
+  getVisibleKanbanTickets,
   getVisibleTickets,
   type SidebarFilters,
 } from './filtering'
@@ -87,6 +88,11 @@ export default function App() {
     [filteredTickets, selectedTicket, sidebarFilters],
   )
 
+  const kanbanTickets = useMemo(
+    () => getVisibleKanbanTickets(filteredTickets, selectedTicket, sidebarFilters),
+    [filteredTickets, selectedTicket, sidebarFilters],
+  )
+
   const graphTickets = useMemo(
     () => getVisibleTickets(baseTickets, selectedTicket, sidebarFilters),
     [baseTickets, selectedTicket, sidebarFilters],
@@ -134,7 +140,7 @@ export default function App() {
         criticalPathLength: data.graph.criticalPath.length,
       }}
       visibleTickets={visibleTickets}
-      filteredTickets={filteredTickets}
+      filteredTickets={kanbanTickets}
       graphTickets={graphTickets}
       visibleGraph={visibleGraph}
       statuses={statuses}

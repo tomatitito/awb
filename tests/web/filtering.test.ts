@@ -4,6 +4,7 @@ import {
   createDefaultSidebarFilters,
   getAvailableStatuses,
   getEpicTickets,
+  getVisibleKanbanTickets,
   getVisibleTickets,
   normalizeFilterValue,
   type SidebarFilters,
@@ -86,19 +87,43 @@ describe('sidebar filtering', () => {
     expect(getVisibleTickets(tickets, undefined, filters).map((item) => item.id)).toEqual(['a', 'b'])
   })
 
-  test('filters visible tickets to an epic and its direct children', () => {
+  test('filters visible tickets to the selected epic, its direct children, and ungrouped tickets', () => {
     const tickets = [
       ticket({ id: 'epic-a', type: 'epic' }),
+      ticket({ id: 'epic-b', type: 'epic' }),
       ticket({ id: 'child-a', parent: 'epic-a' }),
       ticket({ id: 'child-b', parent: 'epic-b' }),
-      ticket({ id: 'unrelated' }),
+      ticket({ id: 'ungrouped' }),
     ]
     const filters: SidebarFilters = {
       ...createDefaultSidebarFilters(),
       epicId: 'epic-a',
     }
 
-    expect(getVisibleTickets(tickets, undefined, filters).map((item) => item.id)).toEqual(['epic-a', 'child-a'])
+    expect(getVisibleTickets(tickets, undefined, filters).map((item) => item.id)).toEqual(['epic-a', 'child-a', 'ungrouped'])
+  })
+
+  test('keeps backlog tickets unfiltered by epic selection in kanban view', () => {
+    const tickets = [
+      ticket({ id: 'epic-a', type: 'epic', status: 'open', ready: true }),
+      ticket({ id: 'child-a', parent: 'epic-a', status: 'in progress' }),
+      ticket({ id: 'child-b', parent: 'epic-b', status: 'in progress' }),
+      ticket({ id: 'ungrouped-open', status: 'open', ready: true }),
+      ticket({ id: 'backlog-a', parent: 'epic-a', status: 'open', ready: false }),
+      ticket({ id: 'backlog-b', parent: 'epic-b', status: 'open', ready: false }),
+    ]
+    const filters: SidebarFilters = {
+      ...createDefaultSidebarFilters(),
+      epicId: 'epic-a',
+    }
+
+    expect(getVisibleKanbanTickets(tickets, undefined, filters).map((item) => item.id)).toEqual([
+      'epic-a',
+      'child-a',
+      'ungrouped-open',
+      'backlog-a',
+      'backlog-b',
+    ])
   })
 
   test('filters visible tickets to links from the selected ticket', () => {
