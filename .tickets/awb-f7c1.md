@@ -1,6 +1,6 @@
 ---
 id: awb-f7c1
-status: open
+status: closed
 deps: [awb-8k2m]
 links: [awb-3n5p]
 created: 2026-04-18T00:00:00Z

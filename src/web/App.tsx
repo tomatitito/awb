@@ -14,6 +14,8 @@ import { useViewportMode } from './useViewportMode'
 import { compareStatuses, matchesSearch, type GraphDirection, type TabKey } from './workspace'
 import { openAgentPanelFromHeader } from './mobileFlow'
 import { useAgentPanel } from './useAgentPanel'
+import { createAgentRun, listAgentRuns } from './agentApi'
+import type { AgentRunEvent, AgentRunState } from '../agent/types'
 
 export default function App() {
   const [data, setData] = useState<AppData | null>(null)
@@ -26,12 +28,21 @@ export default function App() {
   const [graphDirectionPreference, setGraphDirectionPreference] = useState<GraphDirection | undefined>()
   const [showCriticalPath, setShowCriticalPath] = useState(true)
   const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false)
+  const [agentRuns, setAgentRuns] = useState<AgentRunState[]>([])
+  const [pendingRunTicketIds, setPendingRunTicketIds] = useState<Set<string>>(() => new Set())
+  const [runLaunchError, setRunLaunchError] = useState<string | undefined>()
   const agentPanel = useAgentPanel()
   const { setSelectedTicketContext } = agentPanel
   const hasLoadedOnceRef = useRef(false)
+  const runLockTicketIdsRef = useRef<Set<string>>(new Set())
   const viewportMode = useViewportMode()
 
   useEffect(() => {
+    const mergeRun = (runs: AgentRunState[], nextRun: AgentRunState): AgentRunState[] => {
+      const nextRuns = runs.filter((run) => run.id !== nextRun.id)
+      return [nextRun, ...nextRuns].sort((left, right) => right.createdAt - left.createdAt)
+    }
+
     const loadData = async () => {
       try {
         const response = await fetch('/api/tickets')
@@ -49,9 +60,20 @@ export default function App() {
       }
     }
 
+    const loadRuns = async () => {
+      try {
+        const runs = await listAgentRuns()
+        setAgentRuns(runs)
+      } catch (error) {
+        console.error('Failed to load agent runs', error)
+      }
+    }
+
     void loadData()
+    void loadRuns()
 
     const eventSource = new EventSource('/api/events')
+    const runEventSource = new EventSource('/api/agent/runs/events')
     const handleReload = () => {
       void loadData()
     }
@@ -59,13 +81,35 @@ export default function App() {
       console.error('Ticket reload failed', event.data)
     }
 
+    const handleRunEvent = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as AgentRunEvent | { type: 'ready'; runs: AgentRunState[] }
+        if (payload.type === 'ready') {
+          setAgentRuns(payload.runs)
+          return
+        }
+        if (payload.type === 'run-created' || payload.type === 'run-updated') {
+          setAgentRuns((current) => mergeRun(current, payload.run))
+        }
+      } catch (error) {
+        console.error('Failed to process agent run event', error)
+      }
+    }
+
     eventSource.addEventListener('reload', handleReload)
     eventSource.addEventListener('reload-error', handleReloadError as EventListener)
+    runEventSource.addEventListener('ready', handleRunEvent as EventListener)
+    runEventSource.addEventListener('run-created', handleRunEvent as EventListener)
+    runEventSource.addEventListener('run-updated', handleRunEvent as EventListener)
 
     return () => {
       eventSource.removeEventListener('reload', handleReload)
       eventSource.removeEventListener('reload-error', handleReloadError as EventListener)
       eventSource.close()
+      runEventSource.removeEventListener('ready', handleRunEvent as EventListener)
+      runEventSource.removeEventListener('run-created', handleRunEvent as EventListener)
+      runEventSource.removeEventListener('run-updated', handleRunEvent as EventListener)
+      runEventSource.close()
     }
   }, [])
 
@@ -105,6 +149,22 @@ export default function App() {
 
   const graphDirection = graphDirectionPreference ?? (viewportMode === 'mobile' ? 'tb' : 'lr')
 
+  const activeRunTicketIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const run of agentRuns) {
+      if (run.status === 'queued' || run.status === 'starting' || run.status === 'running') {
+        ids.add(run.ticket.ticketId)
+      }
+    }
+    return ids
+  }, [agentRuns])
+
+  useEffect(() => {
+    const next = new Set(activeRunTicketIds)
+    for (const ticketId of pendingRunTicketIds) next.add(ticketId)
+    runLockTicketIdsRef.current = next
+  }, [activeRunTicketIds, pendingRunTicketIds])
+
   useEffect(() => {
     void setSelectedTicketContext(selectedTicket ? {
       ticketId: selectedTicket.id,
@@ -121,6 +181,30 @@ export default function App() {
   const statuses = getAvailableStatuses(data.tickets).sort(compareStatuses)
   const epicTickets = getEpicTickets(data.tickets)
   const ticketById = new Map(data.tickets.map((ticket) => [ticket.id, ticket]))
+
+  const handleStartAgentRun = async (ticketId: string) => {
+    if (runLockTicketIdsRef.current.has(ticketId)) return
+
+    runLockTicketIdsRef.current = new Set(runLockTicketIdsRef.current).add(ticketId)
+    setRunLaunchError(undefined)
+    setPendingRunTicketIds((current) => new Set(current).add(ticketId))
+
+    try {
+      const run = await createAgentRun(ticketId)
+      setAgentRuns((current) => {
+        const nextRuns = current.filter((candidate) => candidate.id !== run.id)
+        return [run, ...nextRuns].sort((left, right) => right.createdAt - left.createdAt)
+      })
+    } catch (error) {
+      setRunLaunchError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPendingRunTicketIds((current) => {
+        const next = new Set(current)
+        next.delete(ticketId)
+        return next
+      })
+    }
+  }
 
   return (
     <ResponsiveWorkspaceLayout
@@ -167,6 +251,11 @@ export default function App() {
         setIsAgentPanelOpen(next.isAgentPanelOpen)
       }}
       onCloseAgentPanel={() => setIsAgentPanelOpen(false)}
+      onStartAgentRun={handleStartAgentRun}
+      activeRunTicketIds={activeRunTicketIds}
+      pendingRunTicketIds={pendingRunTicketIds}
+      runLaunchError={runLaunchError}
+      onDismissRunLaunchError={() => setRunLaunchError(undefined)}
       agentPanel={{
         state: agentPanel.state,
         transcript: agentPanel.transcript,

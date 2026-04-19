@@ -56,6 +56,11 @@ export type WorkspaceLayoutProps = {
   onGraphDirectionPreferenceChange: (direction: GraphDirection | undefined) => void
   showCriticalPath: boolean
   onShowCriticalPathChange: (value: boolean) => void
+  onStartAgentRun: (ticketId: string) => Promise<void>
+  activeRunTicketIds: Set<string>
+  pendingRunTicketIds: Set<string>
+  runLaunchError?: string
+  onDismissRunLaunchError: () => void
   isAgentPanelOpen: boolean
   lastActiveWorkspaceTab: TabKey
   onToggleAgentPanel: () => void
@@ -92,6 +97,8 @@ function WorkspaceChrome({
   epicTickets,
   sidebarFilters,
   onSidebarFiltersChange,
+  runLaunchError,
+  onDismissRunLaunchError,
 }: Pick<WorkspaceLayoutProps,
   | 'viewportMode'
   | 'projectDir'
@@ -108,6 +115,8 @@ function WorkspaceChrome({
   | 'epicTickets'
   | 'sidebarFilters'
   | 'onSidebarFiltersChange'
+  | 'runLaunchError'
+  | 'onDismissRunLaunchError'
 > & { children: ReactNode }) {
   const agentToggleLabel = viewportMode === 'desktop'
     ? (isAgentPanelOpen ? 'Hide agent panel' : 'Show agent panel')
@@ -161,6 +170,12 @@ function WorkspaceChrome({
           />
         </>
       )}
+      {runLaunchError ? (
+        <div className="run-launch-toast" role="status" aria-live="polite">
+          <span>{runLaunchError}</span>
+          <button type="button" className="secondary-button" onClick={onDismissRunLaunchError}>Dismiss</button>
+        </div>
+      ) : null}
       {children}
     </div>
   )
@@ -190,6 +205,9 @@ function DesktopWorkspaceLayout(props: WorkspaceLayoutProps) {
         onSelect={props.onSelectTicket}
         onDirectionPreferenceChange={props.onGraphDirectionPreferenceChange}
         onShowCriticalPathChange={props.onShowCriticalPathChange}
+        onStartAgentRun={props.onStartAgentRun}
+        activeRunTicketIds={props.activeRunTicketIds}
+        pendingRunTicketIds={props.pendingRunTicketIds}
         autoDirectionLabel="Auto"
       />
       <aside className="details-pane">
@@ -203,7 +221,16 @@ function DesktopWorkspaceLayout(props: WorkspaceLayoutProps) {
       <main className={`content ${props.isAgentPanelOpen ? 'content-with-agent-panel' : ''}`}>
         <div className="content-workspace">
           {props.tab === 'graph' ? graphView : null}
-          {props.tab === 'kanban' ? <KanbanView tickets={props.filteredTickets} selectedId={props.selectedId} onSelect={props.onSelectTicket} /> : null}
+          {props.tab === 'kanban' ? (
+            <KanbanView
+              tickets={props.filteredTickets}
+              selectedId={props.selectedId}
+              onSelect={props.onSelectTicket}
+              onStartAgentRun={props.onStartAgentRun}
+              activeRunTicketIds={props.activeRunTicketIds}
+              pendingRunTicketIds={props.pendingRunTicketIds}
+                  />
+          ) : null}
           {props.tab === 'details' ? (
             <div className="split-view split-view-details">
               <TicketSidebar
@@ -266,12 +293,24 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
                 onSelect={props.onSelectTicket}
                 onDirectionPreferenceChange={props.onGraphDirectionPreferenceChange}
                 onShowCriticalPathChange={props.onShowCriticalPathChange}
-                autoDirectionLabel="Auto"
+                onStartAgentRun={props.onStartAgentRun}
+                activeRunTicketIds={props.activeRunTicketIds}
+                pendingRunTicketIds={props.pendingRunTicketIds}
+                        autoDirectionLabel="Auto"
               />
             </div>
           ) : null}
 
-          {props.tab === 'kanban' ? <KanbanView tickets={props.filteredTickets} selectedId={props.selectedId} onSelect={props.onSelectTicket} /> : null}
+          {props.tab === 'kanban' ? (
+            <KanbanView
+              tickets={props.filteredTickets}
+              selectedId={props.selectedId}
+              onSelect={props.onSelectTicket}
+              onStartAgentRun={props.onStartAgentRun}
+              activeRunTicketIds={props.activeRunTicketIds}
+              pendingRunTicketIds={props.pendingRunTicketIds}
+                  />
+          ) : null}
 
           {props.tab === 'details' ? (
             <div className="split-view split-view-tablet-details">
@@ -327,11 +366,23 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
               onSelect={openDetailsForTicket}
               onDirectionPreferenceChange={props.onGraphDirectionPreferenceChange}
               onShowCriticalPathChange={props.onShowCriticalPathChange}
-              autoDirectionLabel={`Auto (${props.graphDirection === 'tb' ? 'Top → bottom' : 'Left → right'})`}
+              onStartAgentRun={props.onStartAgentRun}
+              activeRunTicketIds={props.activeRunTicketIds}
+              pendingRunTicketIds={props.pendingRunTicketIds}
+                    autoDirectionLabel={`Auto (${props.graphDirection === 'tb' ? 'Top → bottom' : 'Left → right'})`}
             />
           ) : null}
 
-          {props.tab === 'kanban' ? <KanbanView tickets={props.filteredTickets} selectedId={props.selectedId} onSelect={showSelectedTicketInDetails} /> : null}
+          {props.tab === 'kanban' ? (
+            <KanbanView
+              tickets={props.filteredTickets}
+              selectedId={props.selectedId}
+              onSelect={showSelectedTicketInDetails}
+              onStartAgentRun={props.onStartAgentRun}
+              activeRunTicketIds={props.activeRunTicketIds}
+              pendingRunTicketIds={props.pendingRunTicketIds}
+                  />
+          ) : null}
 
           {props.tab === 'details' ? (
             <section className="details-pane details-pane-mobile">

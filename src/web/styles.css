@@ -51,19 +51,25 @@ select {
   font: inherit;
 }
 
+[role='button'] {
+  outline: none;
+}
+
 button {
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
 }
 
 button:hover,
 input:hover,
-select:hover {
+select:hover,
+[role='button']:hover {
   border-color: var(--text);
 }
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+[role='button']:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
@@ -314,6 +320,17 @@ select:focus-visible {
 .mobile-tabs-nav button {
   min-height: 44px;
   padding: 10px 8px;
+}
+
+.run-launch-toast {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(204, 102, 102, 0.4);
+  background: rgba(204, 102, 102, 0.12);
+  color: #f3c1c1;
 }
 
 .content {
@@ -729,7 +746,8 @@ select:focus-visible {
   transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
-.graph-ticket-card:hover {
+.graph-ticket-card:hover,
+.graph-ticket-card:focus-visible {
   transform: translateY(-1px);
   border-color: var(--border);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
@@ -773,6 +791,31 @@ select:focus-visible {
   gap: 6px;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.agent-run-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: rgba(16, 163, 127, 0.16);
+  color: var(--accent);
+  cursor: pointer;
+  line-height: 1;
+}
+
+
+.agent-run-button.disabled {
+  border-color: var(--dim);
+  background: rgba(128, 128, 128, 0.12);
+  color: var(--muted);
+  cursor: default;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .graph-ticket-card-top strong {
@@ -1360,7 +1403,8 @@ select:focus-visible {
   cursor: pointer;
 }
 
-.kanban-card:hover {
+.kanban-card:hover,
+.kanban-card:focus-visible {
   background: var(--selected-bg);
 }
 
@@ -1378,6 +1422,12 @@ select:focus-visible {
 
 .kanban-card-header {
   align-items: center;
+}
+
+.kanban-card-header-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .kanban-card-title {
