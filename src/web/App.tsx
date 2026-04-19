@@ -38,9 +38,18 @@ export default function App() {
   const viewportMode = useViewportMode()
 
   useEffect(() => {
+    const getRunSortTimestamp = (run: AgentRunState): number => run.startedAt ?? run.createdAt
+    const isActiveRun = (run: AgentRunState): boolean => run.status === 'queued' || run.status === 'starting' || run.status === 'running'
+    const compareRuns = (left: AgentRunState, right: AgentRunState): number => {
+      const leftActive = isActiveRun(left)
+      const rightActive = isActiveRun(right)
+      if (leftActive !== rightActive) return leftActive ? -1 : 1
+      return getRunSortTimestamp(right) - getRunSortTimestamp(left)
+    }
+
     const mergeRun = (runs: AgentRunState[], nextRun: AgentRunState): AgentRunState[] => {
       const nextRuns = runs.filter((run) => run.id !== nextRun.id)
-      return [nextRun, ...nextRuns].sort((left, right) => right.createdAt - left.createdAt)
+      return [nextRun, ...nextRuns].sort(compareRuns)
     }
 
     const loadData = async () => {
@@ -149,14 +158,28 @@ export default function App() {
 
   const graphDirection = graphDirectionPreference ?? (viewportMode === 'mobile' ? 'tb' : 'lr')
 
+  const activeRuns = useMemo(
+    () => agentRuns.filter((run) => run.status === 'queued' || run.status === 'starting' || run.status === 'running'),
+    [agentRuns],
+  )
+
   const activeRunTicketIds = useMemo(() => {
     const ids = new Set<string>()
-    for (const run of agentRuns) {
-      if (run.status === 'queued' || run.status === 'starting' || run.status === 'running') {
-        ids.add(run.ticket.ticketId)
-      }
+    for (const run of activeRuns) {
+      ids.add(run.ticket.ticketId)
     }
     return ids
+  }, [activeRuns])
+
+  const sortedAgentRuns = useMemo(() => {
+    const getRunSortTimestamp = (run: AgentRunState): number => run.startedAt ?? run.createdAt
+    const isActiveRun = (run: AgentRunState): boolean => run.status === 'queued' || run.status === 'starting' || run.status === 'running'
+    return [...agentRuns].sort((left, right) => {
+      const leftActive = isActiveRun(left)
+      const rightActive = isActiveRun(right)
+      if (leftActive !== rightActive) return leftActive ? -1 : 1
+      return getRunSortTimestamp(right) - getRunSortTimestamp(left)
+    })
   }, [agentRuns])
 
   useEffect(() => {
@@ -193,7 +216,12 @@ export default function App() {
       const run = await createAgentRun(ticketId)
       setAgentRuns((current) => {
         const nextRuns = current.filter((candidate) => candidate.id !== run.id)
-        return [run, ...nextRuns].sort((left, right) => right.createdAt - left.createdAt)
+        return [run, ...nextRuns].sort((left, right) => {
+          const leftActive = left.status === 'queued' || left.status === 'starting' || left.status === 'running'
+          const rightActive = right.status === 'queued' || right.status === 'starting' || right.status === 'running'
+          if (leftActive !== rightActive) return leftActive ? -1 : 1
+          return (right.startedAt ?? right.createdAt) - (left.startedAt ?? left.createdAt)
+        })
       })
     } catch (error) {
       setRunLaunchError(error instanceof Error ? error.message : String(error))
@@ -216,6 +244,9 @@ export default function App() {
       onSearchChange={setSearch}
       hideClosed={hideClosed}
       onHideClosedChange={setHideClosed}
+      agentRuns={sortedAgentRuns}
+      activeAgentRunCount={activeRuns.length}
+      onOpenAgentsTab={() => setTab('agents')}
       selectedId={selectedId}
       onSelectTicket={(id) => setSelectedId(id)}
       dataStats={data.stats}

@@ -9,10 +9,10 @@ import {
   UNGROUPED_EPIC_FILTER,
   type SidebarFilters,
 } from './filtering'
-import type { AgentPanelState } from '../agent/types'
+import type { AgentPanelState, AgentRunState } from '../agent/types'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
 
-export type TabKey = 'graph' | 'kanban' | 'details'
+export type TabKey = 'graph' | 'kanban' | 'agents' | 'details'
 export type GraphDirection = 'lr' | 'tb'
 
 const STATUS_ORDER = ['open', 'in progress', 'closed', 'todo', 'blocked', 'review']
@@ -75,6 +75,10 @@ function getEpicFilterOptionLabel(epicId: string, epics: DerivedTicket[]): strin
   return epic ? `${epic.id} — ${epic.title}` : `Epic ${epicId}`
 }
 
+function formatRunCountLabel(count: number): string {
+  return `${count} active ${count === 1 ? 'run' : 'runs'}`
+}
+
 function EpicFilterSelect({
   epics,
   filters,
@@ -112,6 +116,8 @@ export function WorkspaceTopBar({
   onSearchChange,
   hideClosed,
   onHideClosedChange,
+  activeAgentRunCount,
+  onOpenAgentsTab,
   isAgentPanelOpen,
   onToggleAgentPanel,
   agentToggleLabel,
@@ -121,6 +127,8 @@ export function WorkspaceTopBar({
   onSearchChange: (value: string) => void
   hideClosed: boolean
   onHideClosedChange: (value: boolean) => void
+  activeAgentRunCount: number
+  onOpenAgentsTab: () => void
   isAgentPanelOpen: boolean
   onToggleAgentPanel: () => void
   agentToggleLabel: string
@@ -137,6 +145,14 @@ export function WorkspaceTopBar({
           <input type="checkbox" checked={hideClosed} onChange={(event) => onHideClosedChange(event.target.checked)} />
           hide closed
         </label>
+        <button
+          type="button"
+          className="secondary-button agent-run-count-button"
+          onClick={onOpenAgentsTab}
+          aria-label={`Open Agents tab, ${formatRunCountLabel(activeAgentRunCount)}`}
+        >
+          Agents · {formatRunCountLabel(activeAgentRunCount)}
+        </button>
         <button
           type="button"
           className={`secondary-button ${isAgentPanelOpen ? 'active' : ''}`}
@@ -163,6 +179,7 @@ function WorkspaceViewTabs({
     <nav className={className ?? 'tabs-nav'} aria-label="Views">
       <button data-awb="tab-graph" className={tab === 'graph' ? 'active' : ''} onClick={() => onTabChange('graph')} type="button">Graph</button>
       <button data-awb="tab-kanban" className={tab === 'kanban' ? 'active' : ''} onClick={() => onTabChange('kanban')} type="button">Kanban</button>
+      <button data-awb="tab-agents" className={tab === 'agents' ? 'active' : ''} onClick={() => onTabChange('agents')} type="button">Agents</button>
       <button data-awb="tab-details" className={tab === 'details' ? 'active' : ''} onClick={() => onTabChange('details')} type="button">Details</button>
     </nav>
   )
@@ -236,6 +253,8 @@ export function MobileWorkspaceHeader({
   onSearchChange,
   hideClosed,
   onHideClosedChange,
+  activeAgentRunCount,
+  onOpenAgentsTab,
   isAgentPanelOpen,
   onToggleAgentPanel,
   agentToggleLabel,
@@ -256,6 +275,8 @@ export function MobileWorkspaceHeader({
   onSearchChange: (value: string) => void
   hideClosed: boolean
   onHideClosedChange: (value: boolean) => void
+  activeAgentRunCount: number
+  onOpenAgentsTab: () => void
   isAgentPanelOpen: boolean
   onToggleAgentPanel: () => void
   agentToggleLabel: string
@@ -278,15 +299,25 @@ export function MobileWorkspaceHeader({
           <h1><span className="product-badge">AWB</span> workbench</h1>
           <div className="project-path" title={projectDir}>{projectDir}</div>
         </div>
-        <button
-          type="button"
-          data-awb="mobile-agent-toggle"
-          className={`secondary-button mobile-agent-button ${isAgentPanelOpen ? 'active' : ''}`}
-          aria-pressed={isAgentPanelOpen}
-          onClick={onToggleAgentPanel}
-        >
-          {agentToggleLabel}
-        </button>
+        <div className="mobile-header-actions">
+          <button
+            type="button"
+            className="secondary-button mobile-run-count-button"
+            onClick={onOpenAgentsTab}
+            aria-label={`Open Agents tab, ${formatRunCountLabel(activeAgentRunCount)}`}
+          >
+            Agents · {activeAgentRunCount}
+          </button>
+          <button
+            type="button"
+            data-awb="mobile-agent-toggle"
+            className={`secondary-button mobile-agent-button ${isAgentPanelOpen ? 'active' : ''}`}
+            aria-pressed={isAgentPanelOpen}
+            onClick={onToggleAgentPanel}
+          >
+            {agentToggleLabel}
+          </button>
+        </div>
       </div>
 
       <div className="mobile-header-controls">
@@ -830,6 +861,53 @@ export function KanbanView({
         </section>
       ))}
     </div>
+  )
+}
+
+function formatAgentRunStatus(status: AgentRunState['status']): string {
+  return status.replace(/-/g, ' ')
+}
+
+function formatAgentRunStartedAt(run: AgentRunState): string {
+  const timestamp = run.startedAt ?? run.createdAt
+  return new Date(timestamp).toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+export function AgentsView({ runs }: { runs: AgentRunState[] }) {
+  if (runs.length === 0) {
+    return <div className="empty-state agents-empty-state">No agent runs yet. Start a run from a ready ticket to see it here.</div>
+  }
+
+  return (
+    <section className="agents-view" data-awb="agents-view">
+      <header className="agents-view-header">
+        <div>
+          <h2>Agents</h2>
+          <p>Active runs appear first. Within each group, runs are ordered by started time, most recent first.</p>
+        </div>
+        <span className="badge">{runs.length} total</span>
+      </header>
+      <div className="agents-run-list" role="list" aria-label="Agent runs">
+        {runs.map((run) => (
+          <article key={run.id} className="agents-run-row" role="listitem">
+            <div className="agents-run-row-top">
+              <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
+                {formatAgentRunStatus(run.status)}
+              </span>
+              <span className="agents-run-started-at">{formatAgentRunStartedAt(run)}</span>
+            </div>
+            <div className="agents-run-ticket-id">{run.ticket.ticketId}</div>
+            <div className="agents-run-ticket-title">{run.ticket.title}</div>
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 

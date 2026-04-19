@@ -168,6 +168,12 @@ select:focus-visible,
   gap: 12px;
 }
 
+.mobile-header-actions {
+  display: grid;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .mobile-header-branding {
   min-width: 0;
 }
@@ -258,7 +264,7 @@ select:focus-visible,
 
 .mobile-tabs-nav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -456,6 +462,21 @@ select:focus-visible,
   border-radius: 3px;
   padding: 4px 8px;
   cursor: pointer;
+}
+
+.agent-run-count-button,
+.mobile-run-count-button {
+  color: var(--warning);
+  border-color: rgba(240, 198, 116, 0.45);
+  background: rgba(240, 198, 116, 0.08);
+}
+
+.agent-run-count-button {
+  min-width: 132px;
+}
+
+.mobile-run-count-button {
+  min-height: 40px;
 }
 
 .secondary-button.active {
@@ -1321,6 +1342,77 @@ select:focus-visible,
   align-items: flex-start;
 }
 
+.agents-view {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 24px;
+}
+
+.agents-view-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  background: var(--container-bg);
+}
+
+.agents-view-header h2 {
+  margin: 0 0 6px;
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.agents-view-header p {
+  margin: 0;
+  color: var(--dim);
+}
+
+.agents-run-list {
+  display: grid;
+  gap: 10px;
+}
+
+.agents-run-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  background: var(--container-bg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.agents-run-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.agents-run-started-at {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.agents-run-ticket-id {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.agents-run-ticket-title {
+  color: var(--text);
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.agents-empty-state {
+  margin: 16px 18px 24px;
+}
+
 .kanban-column {
   min-width: 280px;
   max-width: 320px;
@@ -1483,6 +1575,10 @@ select:focus-visible,
 @media (max-width: 900px) {
   .topbar {
     flex-direction: column;
+  }
+
+  .agents-view-header {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .toolbar {

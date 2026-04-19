@@ -3,12 +3,13 @@ import type { DerivedTicket } from '../core/types'
 import type { VisibleGraphDerivation } from '../core/graph'
 import type { SidebarFilters } from './filtering'
 import type { ViewportMode } from './useViewportMode'
-import type { AgentPanelState } from '../agent/types'
+import type { AgentPanelState, AgentRunState } from '../agent/types'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
 import { AgentPanel } from './AgentPanel'
 import {
   AgentOverlay,
   DetailsView,
+  AgentsView,
   GraphPanel,
   KanbanView,
   MobileWorkspaceHeader,
@@ -29,6 +30,9 @@ export type WorkspaceLayoutProps = {
   onSearchChange: (value: string) => void
   hideClosed: boolean
   onHideClosedChange: (value: boolean) => void
+  agentRuns: AgentRunState[]
+  activeAgentRunCount: number
+  onOpenAgentsTab: () => void
   selectedId?: string
   onSelectTicket: (id: string) => void
   dataStats: {
@@ -90,6 +94,8 @@ function WorkspaceChrome({
   onSearchChange,
   hideClosed,
   onHideClosedChange,
+  activeAgentRunCount,
+  onOpenAgentsTab,
   isAgentPanelOpen,
   onToggleAgentPanel,
   dataStats,
@@ -108,6 +114,8 @@ function WorkspaceChrome({
   | 'onSearchChange'
   | 'hideClosed'
   | 'onHideClosedChange'
+  | 'activeAgentRunCount'
+  | 'onOpenAgentsTab'
   | 'isAgentPanelOpen'
   | 'onToggleAgentPanel'
   | 'dataStats'
@@ -131,6 +139,8 @@ function WorkspaceChrome({
           onSearchChange={onSearchChange}
           hideClosed={hideClosed}
           onHideClosedChange={onHideClosedChange}
+          activeAgentRunCount={activeAgentRunCount}
+          onOpenAgentsTab={onOpenAgentsTab}
           isAgentPanelOpen={isAgentPanelOpen}
           onToggleAgentPanel={onToggleAgentPanel}
           agentToggleLabel={agentToggleLabel}
@@ -154,6 +164,8 @@ function WorkspaceChrome({
             onSearchChange={onSearchChange}
             hideClosed={hideClosed}
             onHideClosedChange={onHideClosedChange}
+            activeAgentRunCount={activeAgentRunCount}
+            onOpenAgentsTab={onOpenAgentsTab}
             isAgentPanelOpen={isAgentPanelOpen}
             onToggleAgentPanel={onToggleAgentPanel}
             agentToggleLabel={agentToggleLabel}
@@ -229,8 +241,9 @@ function DesktopWorkspaceLayout(props: WorkspaceLayoutProps) {
               onStartAgentRun={props.onStartAgentRun}
               activeRunTicketIds={props.activeRunTicketIds}
               pendingRunTicketIds={props.pendingRunTicketIds}
-                  />
+            />
           ) : null}
+          {props.tab === 'agents' ? <AgentsView runs={props.agentRuns} /> : null}
           {props.tab === 'details' ? (
             <div className="split-view split-view-details">
               <TicketSidebar
@@ -296,7 +309,7 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
                 onStartAgentRun={props.onStartAgentRun}
                 activeRunTicketIds={props.activeRunTicketIds}
                 pendingRunTicketIds={props.pendingRunTicketIds}
-                        autoDirectionLabel="Auto"
+                autoDirectionLabel="Auto"
               />
             </div>
           ) : null}
@@ -309,8 +322,10 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
               onStartAgentRun={props.onStartAgentRun}
               activeRunTicketIds={props.activeRunTicketIds}
               pendingRunTicketIds={props.pendingRunTicketIds}
-                  />
+            />
           ) : null}
+
+          {props.tab === 'agents' ? <AgentsView runs={props.agentRuns} /> : null}
 
           {props.tab === 'details' ? (
             <div className="split-view split-view-tablet-details">
@@ -369,7 +384,7 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
               onStartAgentRun={props.onStartAgentRun}
               activeRunTicketIds={props.activeRunTicketIds}
               pendingRunTicketIds={props.pendingRunTicketIds}
-                    autoDirectionLabel={`Auto (${props.graphDirection === 'tb' ? 'Top → bottom' : 'Left → right'})`}
+              autoDirectionLabel={`Auto (${props.graphDirection === 'tb' ? 'Top → bottom' : 'Left → right'})`}
             />
           ) : null}
 
@@ -381,8 +396,10 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
               onStartAgentRun={props.onStartAgentRun}
               activeRunTicketIds={props.activeRunTicketIds}
               pendingRunTicketIds={props.pendingRunTicketIds}
-                  />
+            />
           ) : null}
+
+          {props.tab === 'agents' ? <AgentsView runs={props.agentRuns} /> : null}
 
           {props.tab === 'details' ? (
             <section className="details-pane details-pane-mobile">
