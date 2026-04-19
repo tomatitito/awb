@@ -142,12 +142,12 @@ describe('AgentController', () => {
 
     const next = controller.getRun(run.id)
     expect(next?.status).toBe('completed')
-    expect(next?.transcript.map((entry) => [entry.role, entry.text])).toEqual([
+    expect(next?.transcript.entries.map((entry) => [entry.role, entry.text])).toEqual([
       ['user', expect.stringContaining('Ticket ID: awb-1')],
       ['assistant', 'Hello world'],
       ['user', 'Please add a regression test.'],
     ])
-    expect(next?.toolActivity).toEqual([
+    expect(next?.transcript.toolActivity).toEqual([
       expect.objectContaining({ toolCallId: 'tool-1', toolName: 'read', isError: false }),
     ])
     expect(mockSession.promptCalls.at(-1)).toBe('Please add a regression test.')

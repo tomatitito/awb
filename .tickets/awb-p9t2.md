@@ -1,6 +1,6 @@
 ---
 id: awb-p9t2
-status: open
+status: closed
 deps: [awb-8k2m, awb-j6r4]
 links: [awb-3n5p]
 created: 2026-04-18T00:00:00Z

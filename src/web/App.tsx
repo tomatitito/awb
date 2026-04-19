@@ -14,7 +14,7 @@ import { useViewportMode } from './useViewportMode'
 import { compareStatuses, matchesSearch, type GraphDirection, type TabKey } from './workspace'
 import { openAgentPanelFromHeader } from './mobileFlow'
 import { useAgentPanel } from './useAgentPanel'
-import { createAgentRun, listAgentRuns } from './agentApi'
+import { abortSpecificAgentRun, createAgentRun, listAgentRuns, sendAgentRunPrompt } from './agentApi'
 import type { AgentRunEvent, AgentRunState } from '../agent/types'
 
 export default function App() {
@@ -22,6 +22,7 @@ export default function App() {
   const [tab, setTab] = useState<TabKey>('graph')
   const [lastActiveWorkspaceTab, setLastActiveWorkspaceTab] = useState<TabKey>('graph')
   const [selectedId, setSelectedId] = useState<string | undefined>()
+  const [selectedAgentRunId, setSelectedAgentRunId] = useState<string | undefined>()
   const [search, setSearch] = useState('')
   const [hideClosed, setHideClosed] = useState(false)
   const [sidebarFilters, setSidebarFilters] = useState<SidebarFilters>(() => createDefaultSidebarFilters())
@@ -189,6 +190,13 @@ export default function App() {
   }, [activeRunTicketIds, pendingRunTicketIds])
 
   useEffect(() => {
+    setSelectedAgentRunId((current) => {
+      if (current && sortedAgentRuns.some((run) => run.id === current)) return current
+      return sortedAgentRuns[0]?.id
+    })
+  }, [sortedAgentRuns])
+
+  useEffect(() => {
     void setSelectedTicketContext(selectedTicket ? {
       ticketId: selectedTicket.id,
       title: selectedTicket.title,
@@ -245,8 +253,16 @@ export default function App() {
       hideClosed={hideClosed}
       onHideClosedChange={setHideClosed}
       agentRuns={sortedAgentRuns}
+      selectedAgentRunId={selectedAgentRunId}
       activeAgentRunCount={activeRuns.length}
-      onOpenAgentsTab={() => setTab('agents')}
+      onOpenAgentsTab={() => {
+        if (viewportMode === 'mobile') setSelectedAgentRunId(undefined)
+        setTab('agents')
+      }}
+      onSelectAgentRun={setSelectedAgentRunId}
+      onBackToAgentsList={() => setSelectedAgentRunId(undefined)}
+      onSendAgentRunPrompt={sendAgentRunPrompt}
+      onAbortAgentRun={abortSpecificAgentRun}
       selectedId={selectedId}
       onSelectTicket={(id) => setSelectedId(id)}
       dataStats={data.stats}

@@ -10,6 +10,7 @@ import {
   type SidebarFilters,
 } from './filtering'
 import type { AgentPanelState, AgentRunState } from '../agent/types'
+import type { ViewportMode } from './useViewportMode'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
 
 export type TabKey = 'graph' | 'kanban' | 'agents' | 'details'
@@ -868,6 +869,25 @@ function formatAgentRunStatus(status: AgentRunState['status']): string {
   return status.replace(/-/g, ' ')
 }
 
+function isActiveAgentRun(run: AgentRunState): boolean {
+  return run.status === 'queued' || run.status === 'starting' || run.status === 'running'
+}
+
+function formatAgentRunEntryTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function stringifyAgentRunValue(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'string') return value
+  try {
+    const result = JSON.stringify(value)
+    return result.length > 220 ? `${result.slice(0, 217)}…` : result
+  } catch {
+    return String(value)
+  }
+}
+
 function formatAgentRunStartedAt(run: AgentRunState): string {
   const timestamp = run.startedAt ?? run.createdAt
   return new Date(timestamp).toLocaleString([], {
@@ -879,10 +899,161 @@ function formatAgentRunStartedAt(run: AgentRunState): string {
   })
 }
 
-export function AgentsView({ runs }: { runs: AgentRunState[] }) {
+function AgentRunDetail({
+  run,
+  onSendPrompt,
+  onAbortRun,
+  onBack,
+  showBack,
+}: {
+  run?: AgentRunState
+  onSendPrompt: (runId: string, text: string) => Promise<void>
+  onAbortRun: (runId: string) => Promise<void>
+  onBack?: () => void
+  showBack: boolean
+}) {
+  const [promptText, setPromptText] = useState('Continue implementing the ticket and report progress.')
+  const [actionError, setActionError] = useState<string | undefined>()
+
+  if (!run) {
+    return <div className="empty-state agents-detail-empty-state">Select a run to inspect its transcript and tool activity.</div>
+  }
+
+  const active = isActiveAgentRun(run)
+  const transcript = run.transcript.entries
+  const toolActivity = [...run.transcript.toolActivity].slice(-12).reverse()
+
+  return (
+    <section className="agent-run-detail" data-awb="agent-run-detail">
+      <div className="agent-run-detail-header">
+        <div>
+          <div className="agent-run-detail-title-row">
+            {showBack ? <button type="button" className="secondary-button" onClick={onBack}>Back</button> : null}
+            <strong>{run.ticket.ticketId} — {run.ticket.title}</strong>
+          </div>
+          <div className="agent-panel-subtitle">Run {run.id.slice(0, 12)} · started {formatAgentRunStartedAt(run)}</div>
+        </div>
+        <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
+          {formatAgentRunStatus(run.status)}
+        </span>
+      </div>
+
+      <div className="agent-panel-section-grid">
+        <div>
+          <strong>Model</strong>
+          <span>{run.model ? `${run.model.provider}/${run.model.id}` : '—'}</span>
+        </div>
+        <div>
+          <strong>Session</strong>
+          <span>{run.sessionId ? run.sessionId.slice(0, 12) : '—'}</span>
+        </div>
+        <div>
+          <strong>Queue</strong>
+          <span>{run.queuedSteeringCount + run.queuedFollowUpCount}</span>
+        </div>
+      </div>
+
+      <section className="agent-panel-section">
+        <strong>Transcript</strong>
+        <div className="agent-transcript">
+          {transcript.length === 0 ? <div className="empty-inline">No transcript yet.</div> : null}
+          {transcript.map((entry) => (
+            <article key={entry.id} className={`agent-transcript-entry ${entry.role === 'assistant' ? 'assistant' : 'error'}`}>
+              <div className="agent-transcript-entry-top">
+                <span>{entry.role}</span>
+                <span>{formatAgentRunEntryTime(entry.timestamp)}</span>
+              </div>
+              <pre>{entry.text || (entry.role === 'assistant' && entry.isStreaming ? '…' : '')}</pre>
+              {entry.errorMessage ? <div className="agent-panel-error">{entry.errorMessage}</div> : null}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="agent-panel-section">
+        <strong>Tool activity</strong>
+        <div className="agent-tool-list">
+          {toolActivity.length === 0 ? <div className="empty-inline">No tool calls yet.</div> : null}
+          {toolActivity.map((tool) => (
+            <div key={tool.toolCallId} className="agent-tool-item">
+              <div className="agent-tool-item-top">
+                <span>{tool.toolName}</span>
+                <span>{tool.completedAt ? (tool.isError ? 'error' : 'done') : 'running'}</span>
+              </div>
+              {tool.args !== undefined ? <code>{stringifyAgentRunValue(tool.args)}</code> : null}
+              {tool.result !== undefined ? <code>{stringifyAgentRunValue(tool.result)}</code> : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {active ? (
+        <form
+          className="agent-composer"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const text = promptText.trim()
+            if (!text) return
+            setActionError(undefined)
+            void onSendPrompt(run.id, text).catch((error) => {
+              setActionError(error instanceof Error ? error.message : String(error))
+            })
+          }}
+        >
+          <strong>Follow-up prompt</strong>
+          <textarea value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Ask the run what to do next" rows={5} />
+          {actionError ? <div className="agent-panel-error">{actionError}</div> : null}
+          <div className="agent-run-controls" aria-label="Run controls">
+            <button type="submit" className="primary-button" disabled={run.status === 'queued' || run.status === 'starting'}>Send</button>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={run.status === 'queued' || run.status === 'starting'}
+              onClick={() => {
+                setActionError(undefined)
+                void onAbortRun(run.id).catch((error) => {
+                  setActionError(error instanceof Error ? error.message : String(error))
+                })
+              }}
+            >
+              Stop
+            </button>
+          </div>
+        </form>
+      ) : (
+        <section className="agent-panel-section">
+          <strong>Run state</strong>
+          <div className="agent-panel-copy">This run is read-only because it is no longer active.</div>
+        </section>
+      )}
+    </section>
+  )
+}
+
+export function AgentsView({
+  runs,
+  selectedRunId,
+  onSelectRun,
+  onBack,
+  onSendPrompt,
+  onAbortRun,
+  viewportMode,
+}: {
+  runs: AgentRunState[]
+  selectedRunId?: string
+  onSelectRun: (runId: string) => void
+  onBack: () => void
+  onSendPrompt: (runId: string, text: string) => Promise<void>
+  onAbortRun: (runId: string) => Promise<void>
+  viewportMode: ViewportMode
+}) {
   if (runs.length === 0) {
     return <div className="empty-state agents-empty-state">No agent runs yet. Start a run from a ready ticket to see it here.</div>
   }
+
+  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0]
+  const isMobile = viewportMode === 'mobile'
+  const showDetailOnly = isMobile && Boolean(selectedRunId)
 
   return (
     <section className="agents-view" data-awb="agents-view">
@@ -893,19 +1064,38 @@ export function AgentsView({ runs }: { runs: AgentRunState[] }) {
         </div>
         <span className="badge">{runs.length} total</span>
       </header>
-      <div className="agents-run-list" role="list" aria-label="Agent runs">
-        {runs.map((run) => (
-          <article key={run.id} className="agents-run-row" role="listitem">
-            <div className="agents-run-row-top">
-              <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
-                {formatAgentRunStatus(run.status)}
-              </span>
-              <span className="agents-run-started-at">{formatAgentRunStartedAt(run)}</span>
-            </div>
-            <div className="agents-run-ticket-id">{run.ticket.ticketId}</div>
-            <div className="agents-run-ticket-title">{run.ticket.title}</div>
-          </article>
-        ))}
+      <div className={`agents-layout ${isMobile ? 'mobile' : 'desktop'}`}>
+        {!showDetailOnly ? (
+          <div className="agents-run-list" role="list" aria-label="Agent runs">
+            {runs.map((run) => (
+              <button
+                key={run.id}
+                type="button"
+                className={`agents-run-row ${selectedRun?.id === run.id ? 'selected' : ''}`}
+                role="listitem"
+                onClick={() => onSelectRun(run.id)}
+              >
+                <div className="agents-run-row-top">
+                  <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
+                    {formatAgentRunStatus(run.status)}
+                  </span>
+                  <span className="agents-run-started-at">{formatAgentRunStartedAt(run)}</span>
+                </div>
+                <div className="agents-run-ticket-id">{run.ticket.ticketId}</div>
+                <div className="agents-run-ticket-title">{run.ticket.title}</div>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {(!isMobile || showDetailOnly) ? (
+          <AgentRunDetail
+            run={selectedRun}
+            onSendPrompt={onSendPrompt}
+            onAbortRun={onAbortRun}
+            onBack={onBack}
+            showBack={isMobile}
+          />
+        ) : null}
       </div>
     </section>
   )

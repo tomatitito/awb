@@ -31,8 +31,13 @@ export type WorkspaceLayoutProps = {
   hideClosed: boolean
   onHideClosedChange: (value: boolean) => void
   agentRuns: AgentRunState[]
+  selectedAgentRunId?: string
   activeAgentRunCount: number
   onOpenAgentsTab: () => void
+  onSelectAgentRun: (runId: string) => void
+  onBackToAgentsList: () => void
+  onSendAgentRunPrompt: (runId: string, text: string) => Promise<void>
+  onAbortAgentRun: (runId: string) => Promise<void>
   selectedId?: string
   onSelectTicket: (id: string) => void
   dataStats: {
@@ -243,7 +248,17 @@ function DesktopWorkspaceLayout(props: WorkspaceLayoutProps) {
               pendingRunTicketIds={props.pendingRunTicketIds}
             />
           ) : null}
-          {props.tab === 'agents' ? <AgentsView runs={props.agentRuns} /> : null}
+          {props.tab === 'agents' ? (
+            <AgentsView
+              runs={props.agentRuns}
+              selectedRunId={props.selectedAgentRunId}
+              onSelectRun={props.onSelectAgentRun}
+              onBack={props.onBackToAgentsList}
+              onSendPrompt={props.onSendAgentRunPrompt}
+              onAbortRun={props.onAbortAgentRun}
+              viewportMode={props.viewportMode}
+            />
+          ) : null}
           {props.tab === 'details' ? (
             <div className="split-view split-view-details">
               <TicketSidebar
@@ -325,7 +340,17 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
             />
           ) : null}
 
-          {props.tab === 'agents' ? <AgentsView runs={props.agentRuns} /> : null}
+          {props.tab === 'agents' ? (
+            <AgentsView
+              runs={props.agentRuns}
+              selectedRunId={props.selectedAgentRunId}
+              onSelectRun={props.onSelectAgentRun}
+              onBack={props.onBackToAgentsList}
+              onSendPrompt={props.onSendAgentRunPrompt}
+              onAbortRun={props.onAbortAgentRun}
+              viewportMode={props.viewportMode}
+            />
+          ) : null}
 
           {props.tab === 'details' ? (
             <div className="split-view split-view-tablet-details">
@@ -399,7 +424,17 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
             />
           ) : null}
 
-          {props.tab === 'agents' ? <AgentsView runs={props.agentRuns} /> : null}
+          {props.tab === 'agents' ? (
+            <AgentsView
+              runs={props.agentRuns}
+              selectedRunId={props.selectedAgentRunId}
+              onSelectRun={props.onSelectAgentRun}
+              onBack={props.onBackToAgentsList}
+              onSendPrompt={props.onSendAgentRunPrompt}
+              onAbortRun={props.onAbortAgentRun}
+              viewportMode={props.viewportMode}
+            />
+          ) : null}
 
           {props.tab === 'details' ? (
             <section className="details-pane details-pane-mobile">
