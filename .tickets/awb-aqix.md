@@ -1,8 +1,8 @@
 ---
 id: awb-aqix
 status: open
-deps: []
-links: []
+deps: [awb-8k2m]
+links: [awb-3n5p]
 created: 2026-04-18T22:03:17Z
 type: task
 priority: 1
