@@ -1,21 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppData } from '../core/types'
+import type { AgentRunEvent, AgentRunState } from '../agent/types'
 import { deriveVisibleGraph } from '../core/graph'
-import {
-  createDefaultSidebarFilters,
-  getAvailableStatuses,
-  getEpicTickets,
-  getVisibleKanbanTickets,
-  getVisibleTickets,
-  type SidebarFilters,
-} from './filtering'
+import type { AppData } from '../core/types'
+import { abortSpecificAgentRun, createAgentRun, listAgentRuns, sendAgentRunPrompt } from './agentApi'
+import { createDefaultSidebarFilters, getAvailableStatuses, getEpicTickets, getVisibleKanbanTickets, getVisibleTickets, type SidebarFilters } from './filtering'
 import { ResponsiveWorkspaceLayout } from './layouts'
-import { useViewportMode } from './useViewportMode'
-import { compareStatuses, matchesSearch, type GraphDirection, type TabKey } from './workspace'
 import { openAgentPanelFromHeader } from './mobileFlow'
 import { useAgentPanel } from './useAgentPanel'
-import { abortSpecificAgentRun, createAgentRun, listAgentRuns, sendAgentRunPrompt } from './agentApi'
-import type { AgentRunEvent, AgentRunState } from '../agent/types'
+import { useViewportMode } from './useViewportMode'
+import { compareStatuses, type GraphDirection, matchesSearch, type TabKey } from './workspace'
 
 export default function App() {
   const [data, setData] = useState<AppData | null>(null)
@@ -137,32 +130,17 @@ export default function App() {
     }
   }, [isAgentPanelOpen, tab])
 
-  const visibleTickets = useMemo(
-    () => getVisibleTickets(filteredTickets, selectedTicket, sidebarFilters),
-    [filteredTickets, selectedTicket, sidebarFilters],
-  )
+  const visibleTickets = useMemo(() => getVisibleTickets(filteredTickets, selectedTicket, sidebarFilters), [filteredTickets, selectedTicket, sidebarFilters])
 
-  const kanbanTickets = useMemo(
-    () => getVisibleKanbanTickets(filteredTickets, selectedTicket, sidebarFilters),
-    [filteredTickets, selectedTicket, sidebarFilters],
-  )
+  const kanbanTickets = useMemo(() => getVisibleKanbanTickets(filteredTickets, selectedTicket, sidebarFilters), [filteredTickets, selectedTicket, sidebarFilters])
 
-  const graphTickets = useMemo(
-    () => getVisibleTickets(baseTickets, selectedTicket, sidebarFilters),
-    [baseTickets, selectedTicket, sidebarFilters],
-  )
+  const graphTickets = useMemo(() => getVisibleTickets(baseTickets, selectedTicket, sidebarFilters), [baseTickets, selectedTicket, sidebarFilters])
 
-  const visibleGraph = useMemo(
-    () => (data ? deriveVisibleGraph(data.graph, graphTickets, selectedTicket) : undefined),
-    [data, graphTickets, selectedTicket],
-  )
+  const visibleGraph = useMemo(() => (data ? deriveVisibleGraph(data.graph, graphTickets, selectedTicket) : undefined), [data, graphTickets, selectedTicket])
 
   const graphDirection = graphDirectionPreference ?? (viewportMode === 'mobile' ? 'tb' : 'lr')
 
-  const activeRuns = useMemo(
-    () => agentRuns.filter((run) => run.status === 'queued' || run.status === 'starting' || run.status === 'running'),
-    [agentRuns],
-  )
+  const activeRuns = useMemo(() => agentRuns.filter((run) => run.status === 'queued' || run.status === 'starting' || run.status === 'running'), [agentRuns])
 
   const activeRunTicketIds = useMemo(() => {
     const ids = new Set<string>()
@@ -197,12 +175,16 @@ export default function App() {
   }, [sortedAgentRuns])
 
   useEffect(() => {
-    void setSelectedTicketContext(selectedTicket ? {
-      ticketId: selectedTicket.id,
-      title: selectedTicket.title,
-      body: selectedTicket.body,
-      filePath: selectedTicket.filePath,
-    } : undefined)
+    void setSelectedTicketContext(
+      selectedTicket
+        ? {
+            ticketId: selectedTicket.id,
+            title: selectedTicket.title,
+            body: selectedTicket.body,
+            filePath: selectedTicket.filePath,
+          }
+        : undefined,
+    )
   }, [selectedTicket, setSelectedTicketContext])
 
   if (!data || !visibleGraph) {
@@ -309,6 +291,7 @@ export default function App() {
         toolActivity: agentPanel.toolActivity,
         sendPrompt: agentPanel.sendPrompt,
         abort: agentPanel.abort,
+        refreshState: agentPanel.refreshState,
       }}
     />
   )

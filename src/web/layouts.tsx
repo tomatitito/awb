@@ -1,25 +1,25 @@
 import type { ReactNode } from 'react'
-import type { DerivedTicket } from '../core/types'
-import type { VisibleGraphDerivation } from '../core/graph'
-import type { SidebarFilters } from './filtering'
-import type { ViewportMode } from './useViewportMode'
 import type { AgentPanelState, AgentRunState } from '../agent/types'
-import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
+import type { VisibleGraphDerivation } from '../core/graph'
+import type { DerivedTicket } from '../core/types'
 import { AgentPanel } from './AgentPanel'
+import type { SidebarFilters } from './filtering'
+import { closeMobileAgentOverlay, openMobileDetailsForTicket } from './mobileFlow'
+import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
+import type { ViewportMode } from './useViewportMode'
 import {
   AgentOverlay,
-  DetailsView,
   AgentsView,
+  DetailsView,
+  type GraphDirection,
   GraphPanel,
   KanbanView,
   MobileWorkspaceHeader,
+  type TabKey,
   TicketSidebar,
   WorkspaceTabsHeader,
   WorkspaceTopBar,
-  type GraphDirection,
-  type TabKey,
 } from './workspace'
-import { closeMobileAgentOverlay, openMobileDetailsForTicket } from './mobileFlow'
 
 export type WorkspaceLayoutProps = {
   viewportMode: ViewportMode
@@ -80,6 +80,7 @@ export type WorkspaceLayoutProps = {
     toolActivity: ToolActivityEntry[]
     sendPrompt: (text: string) => Promise<void>
     abort: () => Promise<void>
+    refreshState: () => Promise<void>
   }
 }
 
@@ -110,7 +111,8 @@ function WorkspaceChrome({
   onSidebarFiltersChange,
   runLaunchError,
   onDismissRunLaunchError,
-}: Pick<WorkspaceLayoutProps,
+}: Pick<
+  WorkspaceLayoutProps,
   | 'viewportMode'
   | 'projectDir'
   | 'tab'
@@ -131,9 +133,7 @@ function WorkspaceChrome({
   | 'runLaunchError'
   | 'onDismissRunLaunchError'
 > & { children: ReactNode }) {
-  const agentToggleLabel = viewportMode === 'desktop'
-    ? (isAgentPanelOpen ? 'Hide agent panel' : 'Show agent panel')
-    : (isAgentPanelOpen ? 'Hide agent' : 'Open agent')
+  const agentToggleLabel = viewportMode === 'desktop' ? (isAgentPanelOpen ? 'Hide agent panel' : 'Show agent panel') : isAgentPanelOpen ? 'Hide agent' : 'Open agent'
 
   return (
     <div className={`app-shell viewport-${viewportMode}`}>
@@ -190,7 +190,9 @@ function WorkspaceChrome({
       {runLaunchError ? (
         <div className="run-launch-toast" role="status" aria-live="polite">
           <span>{runLaunchError}</span>
-          <button type="button" className="secondary-button" onClick={onDismissRunLaunchError}>Dismiss</button>
+          <button type="button" className="secondary-button" onClick={onDismissRunLaunchError}>
+            Dismiss
+          </button>
         </div>
       ) : null}
       {children}
@@ -286,6 +288,7 @@ function DesktopWorkspaceLayout(props: WorkspaceLayoutProps) {
             toolActivity={props.agentPanel.toolActivity}
             onSendPrompt={props.agentPanel.sendPrompt}
             onAbort={props.agentPanel.abort}
+            onRefreshState={props.agentPanel.refreshState}
           />
         ) : null}
       </main>
@@ -467,6 +470,7 @@ function MobileAgentOverlay(props: WorkspaceLayoutProps) {
       toolActivity={props.agentPanel.toolActivity}
       onSendPrompt={props.agentPanel.sendPrompt}
       onAbort={props.agentPanel.abort}
+      onRefreshState={props.agentPanel.refreshState}
       onClose={handleClose}
       fullscreen={props.viewportMode === 'mobile'}
       returnToLabel={props.lastActiveWorkspaceTab}

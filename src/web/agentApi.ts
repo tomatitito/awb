@@ -1,4 +1,4 @@
-import type { AgentPanelState, AgentRunState, SelectedTicketContext } from '../agent/types'
+import type { AgentAuthProviderState, AgentLoginFlowState, AgentPanelState, AgentRunState, SelectedTicketContext } from '../agent/types'
 
 async function postJson(url: string, body?: Record<string, unknown>) {
   const response = await fetch(url, {
@@ -28,7 +28,7 @@ export async function listAgentRuns(): Promise<AgentRunState[]> {
   if (!response.ok) {
     throw new Error(`Failed to list agent runs: ${response.status}`)
   }
-  const payload = await response.json() as { runs: AgentRunState[] }
+  const payload = (await response.json()) as { runs: AgentRunState[] }
   return payload.runs
 }
 
@@ -37,13 +37,13 @@ export async function fetchAgentRun(runId: string): Promise<AgentRunState> {
   if (!response.ok) {
     throw new Error(`Failed to load agent run ${runId}: ${response.status}`)
   }
-  const payload = await response.json() as { run: AgentRunState }
+  const payload = (await response.json()) as { run: AgentRunState }
   return payload.run
 }
 
 export async function createAgentRun(ticketId: string): Promise<AgentRunState> {
   const response = await postJson('/api/agent/runs', { ticketId })
-  const payload = await response.json() as { run: AgentRunState }
+  const payload = (await response.json()) as { run: AgentRunState }
   return payload.run
 }
 
@@ -65,4 +65,36 @@ export async function abortSpecificAgentRun(runId: string): Promise<void> {
 
 export async function setAgentSelectedTicketContext(ticket: SelectedTicketContext | undefined): Promise<void> {
   await postJson('/api/agent/context', ticket ? ticket : {})
+}
+
+export async function fetchAgentAuthProviders(): Promise<AgentAuthProviderState[]> {
+  const response = await fetch('/api/agent/auth/providers')
+  if (!response.ok) {
+    throw new Error(`Failed to load agent auth providers: ${response.status}`)
+  }
+  const payload = (await response.json()) as { providers: AgentAuthProviderState[] }
+  return payload.providers
+}
+
+export async function startAgentLogin(providerId: string): Promise<AgentLoginFlowState> {
+  const response = await postJson('/api/agent/auth/login', { providerId })
+  const payload = (await response.json()) as { flow: AgentLoginFlowState }
+  return payload.flow
+}
+
+export async function fetchAgentLoginFlow(): Promise<AgentLoginFlowState | undefined> {
+  const response = await fetch('/api/agent/auth/login')
+  if (!response.ok) {
+    throw new Error(`Failed to load agent login flow: ${response.status}`)
+  }
+  const payload = (await response.json()) as { flow?: AgentLoginFlowState }
+  return payload.flow
+}
+
+export async function submitAgentLoginInput(value: string): Promise<void> {
+  await postJson('/api/agent/auth/login/input', { value })
+}
+
+export async function cancelAgentLogin(): Promise<void> {
+  await postJson('/api/agent/auth/login/cancel', {})
 }

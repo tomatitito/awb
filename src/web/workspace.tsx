@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { AgentPanel } from './AgentPanel'
-import type { DerivedTicket } from '../core/types'
-import type { VisibleGraphDerivation } from '../core/graph'
-import {
-  createDefaultSidebarFilters,
-  normalizeFilterValue,
-  UNGROUPED_EPIC_FILTER,
-  type SidebarFilters,
-} from './filtering'
 import type { AgentPanelState, AgentRunState } from '../agent/types'
-import type { ViewportMode } from './useViewportMode'
+import type { VisibleGraphDerivation } from '../core/graph'
+import type { DerivedTicket } from '../core/types'
+import { AgentPanel } from './AgentPanel'
+import { createDefaultSidebarFilters, normalizeFilterValue, type SidebarFilters, UNGROUPED_EPIC_FILTER } from './filtering'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
+import type { ViewportMode } from './useViewportMode'
 
 export type TabKey = 'graph' | 'kanban' | 'agents' | 'details'
 export type GraphDirection = 'lr' | 'tb'
@@ -94,12 +89,7 @@ function EpicFilterSelect({
   dataAwb?: string
 }) {
   return (
-    <select
-      id={id}
-      data-awb={dataAwb}
-      value={filters.epicId}
-      onChange={(event) => onFiltersChange({ ...filters, epicId: event.target.value })}
-    >
+    <select id={id} data-awb={dataAwb} value={filters.epicId} onChange={(event) => onFiltersChange({ ...filters, epicId: event.target.value })}>
       <option value="">All tickets</option>
       <option value={UNGROUPED_EPIC_FILTER}>Without epic</option>
       {epics.map((epic) => (
@@ -137,7 +127,9 @@ export function WorkspaceTopBar({
   return (
     <header className="topbar">
       <div>
-        <h1><span className="product-badge">AWB</span> agentic workbench</h1>
+        <h1>
+          <span className="product-badge">AWB</span> agentic workbench
+        </h1>
         <div className="project-path">{projectDir}</div>
       </div>
       <div className="toolbar">
@@ -154,12 +146,7 @@ export function WorkspaceTopBar({
         >
           Agents · {formatRunCountLabel(activeAgentRunCount)}
         </button>
-        <button
-          type="button"
-          className={`secondary-button ${isAgentPanelOpen ? 'active' : ''}`}
-          aria-pressed={isAgentPanelOpen}
-          onClick={onToggleAgentPanel}
-        >
+        <button type="button" className={`secondary-button ${isAgentPanelOpen ? 'active' : ''}`} aria-pressed={isAgentPanelOpen} onClick={onToggleAgentPanel}>
           {agentToggleLabel}
         </button>
       </div>
@@ -167,21 +154,21 @@ export function WorkspaceTopBar({
   )
 }
 
-function WorkspaceViewTabs({
-  tab,
-  onTabChange,
-  className,
-}: {
-  tab: TabKey
-  onTabChange: (tab: TabKey) => void
-  className?: string
-}) {
+function WorkspaceViewTabs({ tab, onTabChange, className }: { tab: TabKey; onTabChange: (tab: TabKey) => void; className?: string }) {
   return (
     <nav className={className ?? 'tabs-nav'} aria-label="Views">
-      <button data-awb="tab-graph" className={tab === 'graph' ? 'active' : ''} onClick={() => onTabChange('graph')} type="button">Graph</button>
-      <button data-awb="tab-kanban" className={tab === 'kanban' ? 'active' : ''} onClick={() => onTabChange('kanban')} type="button">Kanban</button>
-      <button data-awb="tab-agents" className={tab === 'agents' ? 'active' : ''} onClick={() => onTabChange('agents')} type="button">Agents</button>
-      <button data-awb="tab-details" className={tab === 'details' ? 'active' : ''} onClick={() => onTabChange('details')} type="button">Details</button>
+      <button data-awb="tab-graph" className={tab === 'graph' ? 'active' : ''} onClick={() => onTabChange('graph')} type="button">
+        Graph
+      </button>
+      <button data-awb="tab-kanban" className={tab === 'kanban' ? 'active' : ''} onClick={() => onTabChange('kanban')} type="button">
+        Kanban
+      </button>
+      <button data-awb="tab-agents" className={tab === 'agents' ? 'active' : ''} onClick={() => onTabChange('agents')} type="button">
+        Agents
+      </button>
+      <button data-awb="tab-details" className={tab === 'details' ? 'active' : ''} onClick={() => onTabChange('details')} type="button">
+        Details
+      </button>
     </nav>
   )
 }
@@ -236,14 +223,7 @@ export function WorkspaceTabsHeader({
   return (
     <div className="tabs">
       <WorkspaceViewTabs tab={tab} onTabChange={onTabChange} />
-      <WorkspaceStatsRow
-        total={total}
-        open={open}
-        closed={closed}
-        ready={ready}
-        hasCycle={hasCycle}
-        criticalPathLength={criticalPathLength}
-      />
+      <WorkspaceStatsRow total={total} open={open} closed={closed} ready={ready} hasCycle={hasCycle} criticalPathLength={criticalPathLength} />
     </div>
   )
 }
@@ -297,8 +277,12 @@ export function MobileWorkspaceHeader({
     <header className="mobile-header">
       <div className="mobile-header-top">
         <div className="mobile-header-branding">
-          <h1><span className="product-badge">AWB</span> workbench</h1>
-          <div className="project-path" title={projectDir}>{projectDir}</div>
+          <h1>
+            <span className="product-badge">AWB</span> workbench
+          </h1>
+          <div className="project-path" title={projectDir}>
+            {projectDir}
+          </div>
         </div>
         <div className="mobile-header-actions">
           <button
@@ -325,13 +309,7 @@ export function MobileWorkspaceHeader({
         <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search id or title" />
         <div className="mobile-epic-filter-group">
           <label htmlFor="mobile-epic-filter">Epic scope</label>
-          <EpicFilterSelect
-            epics={epics}
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            id="mobile-epic-filter"
-            dataAwb="mobile-epic-filter"
-          />
+          <EpicFilterSelect epics={epics} filters={filters} onFiltersChange={onFiltersChange} id="mobile-epic-filter" dataAwb="mobile-epic-filter" />
           <div className="mobile-epic-filter-summary">Current: {getEpicFilterOptionLabel(filters.epicId, epics)}</div>
         </div>
         <label className="checkbox mobile-hide-closed-toggle">
@@ -341,15 +319,7 @@ export function MobileWorkspaceHeader({
       </div>
 
       <WorkspaceViewTabs tab={tab} onTabChange={onTabChange} className="mobile-tabs-nav" />
-      <WorkspaceStatsRow
-        total={total}
-        open={open}
-        closed={closed}
-        ready={ready}
-        hasCycle={hasCycle}
-        criticalPathLength={criticalPathLength}
-        className="mobile-stats-row"
-      />
+      <WorkspaceStatsRow total={total} open={open} closed={closed} ready={ready} hasCycle={hasCycle} criticalPathLength={criticalPathLength} className="mobile-stats-row" />
     </header>
   )
 }
@@ -365,17 +335,7 @@ function handleCardKeyDown(event: KeyboardEvent<HTMLElement>, onSelect: () => vo
   onSelect()
 }
 
-function AgentRunButton({
-  ticketId,
-  isPending,
-  isActive,
-  onRun,
-}: {
-  ticketId: string
-  isPending: boolean
-  isActive: boolean
-  onRun: (ticketId: string) => Promise<void>
-}) {
+function AgentRunButton({ ticketId, isPending, isActive, onRun }: { ticketId: string; isPending: boolean; isActive: boolean; onRun: (ticketId: string) => Promise<void> }) {
   const isDisabled = isPending || isActive
   const label = isPending ? 'Starting agent run' : isActive ? 'Agent run active' : 'Start agent run'
 
@@ -424,9 +384,17 @@ function GraphCycleState({ graph }: { graph: VisibleGraphDerivation }) {
 function GraphLegend({ showCriticalPath }: { showCriticalPath: boolean }) {
   return (
     <div className="graph-legend">
-      <span><i className="swatch dep" /> direct dependency</span>
-      {showCriticalPath ? <span><i className="swatch critical" /> critical path</span> : null}
-      <span><i className="swatch related" /> selected related link</span>
+      <span>
+        <i className="swatch dep" /> direct dependency
+      </span>
+      {showCriticalPath ? (
+        <span>
+          <i className="swatch critical" /> critical path
+        </span>
+      ) : null}
+      <span>
+        <i className="swatch related" /> selected related link
+      </span>
     </div>
   )
 }
@@ -450,12 +418,11 @@ type PositionedGraphNode = {
 function getGraphNodePosition(node: VisibleGraphDerivation['nodes'][number], direction: GraphDirection): PositionedGraphNode {
   return {
     ...node,
-    x: direction === 'lr'
-      ? GRAPH_PADDING + node.layer * (GRAPH_CARD_WIDTH + GRAPH_LAYER_GAP)
-      : GRAPH_PADDING + node.order * (GRAPH_CARD_WIDTH + GRAPH_ORDER_GAP),
-    y: direction === 'lr'
-      ? GRAPH_PADDING + GRAPH_LAYER_LABEL_SIZE + node.order * (GRAPH_CARD_HEIGHT + GRAPH_ORDER_GAP)
-      : GRAPH_PADDING + GRAPH_LAYER_LABEL_SIZE + node.layer * (GRAPH_CARD_HEIGHT + GRAPH_LAYER_GAP),
+    x: direction === 'lr' ? GRAPH_PADDING + node.layer * (GRAPH_CARD_WIDTH + GRAPH_LAYER_GAP) : GRAPH_PADDING + node.order * (GRAPH_CARD_WIDTH + GRAPH_ORDER_GAP),
+    y:
+      direction === 'lr'
+        ? GRAPH_PADDING + GRAPH_LAYER_LABEL_SIZE + node.order * (GRAPH_CARD_HEIGHT + GRAPH_ORDER_GAP)
+        : GRAPH_PADDING + GRAPH_LAYER_LABEL_SIZE + node.layer * (GRAPH_CARD_HEIGHT + GRAPH_LAYER_GAP),
   }
 }
 
@@ -508,46 +475,35 @@ export function GraphView({
     selectedCard?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [graph.hasCycle, selectedId, direction])
 
-  const {
-    ticketById,
-    matchingIds,
-    criticalNodeIds,
-    criticalEdgeIds,
-    relatedNodeIds,
-    relatedTargetIds,
-    positionedNodes,
-    positionedNodeById,
-    layerIndexes,
-    width,
-    height,
-  } = useMemo(() => {
-    const ticketById = new Map(tickets.map((ticket) => [ticket.id, ticket]))
-    const matchingIds = new Set(tickets.filter((ticket) => matchesSearch(ticket, search)).map((ticket) => ticket.id))
-    const criticalNodeIds = new Set(graph.criticalPath.nodeIds)
-    const criticalEdgeIds = new Set(graph.criticalPath.edgeIds)
-    const relatedNodeIds = new Set(graph.relatedEdges.flatMap((edge) => [edge.source, edge.target]))
-    const relatedTargetIds = new Set(graph.relatedEdges.map((edge) => edge.target))
-    const positionedNodes = graph.nodes.map((node) => getGraphNodePosition(node, direction))
-    const positionedNodeById = new Map(positionedNodes.map((node) => [node.id, node]))
-    const layerIndexes = Array.from(new Set(graph.nodes.map((node) => node.layer))).sort((a, b) => a - b)
+  const { ticketById, matchingIds, criticalNodeIds, criticalEdgeIds, relatedNodeIds, relatedTargetIds, positionedNodes, positionedNodeById, layerIndexes, width, height } =
+    useMemo(() => {
+      const ticketById = new Map(tickets.map((ticket) => [ticket.id, ticket]))
+      const matchingIds = new Set(tickets.filter((ticket) => matchesSearch(ticket, search)).map((ticket) => ticket.id))
+      const criticalNodeIds = new Set(graph.criticalPath.nodeIds)
+      const criticalEdgeIds = new Set(graph.criticalPath.edgeIds)
+      const relatedNodeIds = new Set(graph.relatedEdges.flatMap((edge) => [edge.source, edge.target]))
+      const relatedTargetIds = new Set(graph.relatedEdges.map((edge) => edge.target))
+      const positionedNodes = graph.nodes.map((node) => getGraphNodePosition(node, direction))
+      const positionedNodeById = new Map(positionedNodes.map((node) => [node.id, node]))
+      const layerIndexes = Array.from(new Set(graph.nodes.map((node) => node.layer))).sort((a, b) => a - b)
 
-    const maxX = positionedNodes.reduce((value, node) => Math.max(value, node.x + GRAPH_CARD_WIDTH), 0)
-    const maxY = positionedNodes.reduce((value, node) => Math.max(value, node.y + GRAPH_CARD_HEIGHT), 0)
+      const maxX = positionedNodes.reduce((value, node) => Math.max(value, node.x + GRAPH_CARD_WIDTH), 0)
+      const maxY = positionedNodes.reduce((value, node) => Math.max(value, node.y + GRAPH_CARD_HEIGHT), 0)
 
-    return {
-      ticketById,
-      matchingIds,
-      criticalNodeIds,
-      criticalEdgeIds,
-      relatedNodeIds,
-      relatedTargetIds,
-      positionedNodes,
-      positionedNodeById,
-      layerIndexes,
-      width: Math.max(maxX + GRAPH_PADDING, 640),
-      height: Math.max(maxY + GRAPH_PADDING, 320),
-    }
-  }, [tickets, graph, direction, search])
+      return {
+        ticketById,
+        matchingIds,
+        criticalNodeIds,
+        criticalEdgeIds,
+        relatedNodeIds,
+        relatedTargetIds,
+        positionedNodes,
+        positionedNodeById,
+        layerIndexes,
+        width: Math.max(maxX + GRAPH_PADDING, 640),
+        height: Math.max(maxY + GRAPH_PADDING, 320),
+      }
+    }, [tickets, graph, direction, search])
 
   if (graph.hasCycle) return <GraphCycleState graph={graph} />
   if (graph.nodes.length === 0) return <GraphEmptyState message="No tickets match the current graph filters." />
@@ -584,7 +540,9 @@ export function GraphView({
                     height={maxY - minY + GRAPH_LAYER_BAND_PADDING * 2}
                     rx="14"
                   />
-                  <text className="graph-layer-label" x={minX} y={minY - 4}>Layer {layer}</text>
+                  <text className="graph-layer-label" x={minX} y={minY - 4}>
+                    Layer {layer}
+                  </text>
                 </g>
               )
             })}
@@ -598,34 +556,20 @@ export function GraphView({
                 'dependency',
                 matchingIds.size > 0 && !(matchingIds.has(edge.source) || matchingIds.has(edge.target)) ? 'dimmed' : '',
                 showCriticalPath && criticalEdgeIds.has(edge.id) ? 'critical' : '',
-              ].filter(Boolean).join(' ')
-              return (
-                <path
-                  key={edge.id}
-                  className={className}
-                  d={buildDependencyPath(source, target, direction)}
-                  markerEnd="url(#graph-arrow-dep)"
-                />
-              )
+              ]
+                .filter(Boolean)
+                .join(' ')
+              return <path key={edge.id} className={className} d={buildDependencyPath(source, target, direction)} markerEnd="url(#graph-arrow-dep)" />
             })}
 
             {graph.relatedEdges.map((edge) => {
               const source = positionedNodeById.get(edge.source)
               const target = positionedNodeById.get(edge.target)
               if (!source || !target) return null
-              const className = [
-                'graph-edge',
-                'related',
-                matchingIds.size > 0 && !(matchingIds.has(edge.source) || matchingIds.has(edge.target)) ? 'dimmed' : '',
-              ].filter(Boolean).join(' ')
-              return (
-                <path
-                  key={edge.id}
-                  className={className}
-                  d={buildDependencyPath(source, target, direction)}
-                  markerEnd="url(#graph-arrow-related)"
-                />
-              )
+              const className = ['graph-edge', 'related', matchingIds.size > 0 && !(matchingIds.has(edge.source) || matchingIds.has(edge.target)) ? 'dimmed' : '']
+                .filter(Boolean)
+                .join(' ')
+              return <path key={edge.id} className={className} d={buildDependencyPath(source, target, direction)} markerEnd="url(#graph-arrow-related)" />
             })}
           </svg>
 
@@ -647,7 +591,9 @@ export function GraphView({
               isRelatedTarget ? 'related-target' : '',
               !isSearchMatch ? 'search-dimmed' : '',
               matchingIds.size > 0 && isSearchMatch ? 'search-match' : '',
-            ].filter(Boolean).join(' ')
+            ]
+              .filter(Boolean)
+              .join(' ')
 
             return (
               <div
@@ -668,12 +614,7 @@ export function GraphView({
                     {ticket.ready ? (
                       <>
                         <span className="badge compact ready">ready</span>
-                        <AgentRunButton
-                          ticketId={ticket.id}
-                          isPending={pendingRunTicketIds.has(ticket.id)}
-                          isActive={activeRunTicketIds.has(ticket.id)}
-                          onRun={onStartAgentRun}
-                        />
+                        <AgentRunButton ticketId={ticket.id} isPending={pendingRunTicketIds.has(ticket.id)} isActive={activeRunTicketIds.has(ticket.id)} onRun={onStartAgentRun} />
                       </>
                     ) : null}
                     <span className={`badge compact ${statusClass}`}>{status}</span>
@@ -841,12 +782,7 @@ export function KanbanView({
                     {ticket.ready ? (
                       <>
                         <span className="badge ready">ready</span>
-                        <AgentRunButton
-                          ticketId={ticket.id}
-                          isPending={pendingRunTicketIds.has(ticket.id)}
-                          isActive={activeRunTicketIds.has(ticket.id)}
-                          onRun={onStartAgentRun}
-                        />
+                        <AgentRunButton ticketId={ticket.id} isPending={pendingRunTicketIds.has(ticket.id)} isActive={activeRunTicketIds.has(ticket.id)} onRun={onStartAgentRun} />
                       </>
                     ) : null}
                   </div>
@@ -928,14 +864,20 @@ function AgentRunDetail({
       <div className="agent-run-detail-header">
         <div>
           <div className="agent-run-detail-title-row">
-            {showBack ? <button type="button" className="secondary-button" onClick={onBack}>Back</button> : null}
-            <strong>{run.ticket.ticketId} — {run.ticket.title}</strong>
+            {showBack ? (
+              <button type="button" className="secondary-button" onClick={onBack}>
+                Back
+              </button>
+            ) : null}
+            <strong>
+              {run.ticket.ticketId} — {run.ticket.title}
+            </strong>
           </div>
-          <div className="agent-panel-subtitle">Run {run.id.slice(0, 12)} · started {formatAgentRunStartedAt(run)}</div>
+          <div className="agent-panel-subtitle">
+            Run {run.id.slice(0, 12)} · started {formatAgentRunStartedAt(run)}
+          </div>
         </div>
-        <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
-          {formatAgentRunStatus(run.status)}
-        </span>
+        <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>{formatAgentRunStatus(run.status)}</span>
       </div>
 
       <div className="agent-panel-section-grid">
@@ -1004,7 +946,9 @@ function AgentRunDetail({
           <textarea value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Ask the run what to do next" rows={5} />
           {actionError ? <div className="agent-panel-error">{actionError}</div> : null}
           <div className="agent-run-controls" aria-label="Run controls">
-            <button type="submit" className="primary-button" disabled={run.status === 'queued' || run.status === 'starting'}>Send</button>
+            <button type="submit" className="primary-button" disabled={run.status === 'queued' || run.status === 'starting'}>
+              Send
+            </button>
             <button
               type="button"
               className="secondary-button"
@@ -1068,13 +1012,7 @@ export function AgentsView({
         {!showDetailOnly ? (
           <div className="agents-run-list" role="list" aria-label="Agent runs">
             {runs.map((run) => (
-              <button
-                key={run.id}
-                type="button"
-                className={`agents-run-row ${selectedRun?.id === run.id ? 'selected' : ''}`}
-                role="listitem"
-                onClick={() => onSelectRun(run.id)}
-              >
+              <button key={run.id} type="button" className={`agents-run-row ${selectedRun?.id === run.id ? 'selected' : ''}`} role="listitem" onClick={() => onSelectRun(run.id)}>
                 <div className="agents-run-row-top">
                   <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
                     {formatAgentRunStatus(run.status)}
@@ -1087,15 +1025,7 @@ export function AgentsView({
             ))}
           </div>
         ) : null}
-        {(!isMobile || showDetailOnly) ? (
-          <AgentRunDetail
-            run={selectedRun}
-            onSendPrompt={onSendPrompt}
-            onAbortRun={onAbortRun}
-            onBack={onBack}
-            showBack={isMobile}
-          />
-        ) : null}
+        {!isMobile || showDetailOnly ? <AgentRunDetail run={selectedRun} onSendPrompt={onSendPrompt} onAbortRun={onAbortRun} onBack={onBack} showBack={isMobile} /> : null}
       </div>
     </section>
   )
@@ -1147,9 +1077,7 @@ export function TicketSidebar({
                     type="checkbox"
                     checked={selectedStatusSet.has(normalized)}
                     onChange={(event) => {
-                      const nextStatuses = event.target.checked
-                        ? [...filters.statuses, status]
-                        : filters.statuses.filter((candidate) => normalizeStatus(candidate) !== normalized)
+                      const nextStatuses = event.target.checked ? [...filters.statuses, status] : filters.statuses.filter((candidate) => normalizeStatus(candidate) !== normalized)
                       onFiltersChange({ ...filters, statuses: nextStatuses })
                     }}
                   />
@@ -1186,12 +1114,7 @@ export function TicketSidebar({
         </div>
 
         <div className="ticket-sidebar-filter-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={!hasActiveFilters}
-            onClick={() => onFiltersChange(createDefaultSidebarFilters())}
-          >
+          <button type="button" className="secondary-button" disabled={!hasActiveFilters} onClick={() => onFiltersChange(createDefaultSidebarFilters())}>
             Clear filters
           </button>
         </div>
@@ -1202,12 +1125,7 @@ export function TicketSidebar({
           <div className="empty-state">No tickets match the current filters.</div>
         ) : (
           tickets.map((ticket) => (
-            <button
-              key={ticket.id}
-              type="button"
-              className={`ticket-sidebar-item ${selectedId === ticket.id ? 'selected' : ''}`}
-              onClick={() => onSelect(ticket.id)}
-            >
+            <button key={ticket.id} type="button" className={`ticket-sidebar-item ${selectedId === ticket.id ? 'selected' : ''}`} onClick={() => onSelect(ticket.id)}>
               <div className="ticket-sidebar-item-top">
                 <strong title={getTicketHoverText(ticket)}>{ticket.id}</strong>
                 <StatusBadge ticket={ticket} />
@@ -1227,17 +1145,7 @@ export function TicketSidebar({
   )
 }
 
-function RelatedList({
-  label,
-  ids,
-  ticketById,
-  onSelect,
-}: {
-  label: string
-  ids: string[]
-  ticketById: Map<string, DerivedTicket>
-  onSelect: (id: string) => void
-}) {
+function RelatedList({ label, ids, ticketById, onSelect }: { label: string; ids: string[]; ticketById: Map<string, DerivedTicket>; onSelect: (id: string) => void }) {
   return (
     <div className="related-block">
       <strong>{label}</strong>
@@ -1246,13 +1154,7 @@ function RelatedList({
       ) : (
         <div className="related-list">
           {ids.map((id) => (
-            <button
-              key={id}
-              type="button"
-              className="ticket-link"
-              onClick={() => onSelect(id)}
-              title={getTicketHoverText(ticketById.get(id))}
-            >
+            <button key={id} type="button" className="ticket-link" onClick={() => onSelect(id)} title={getTicketHoverText(ticketById.get(id))}>
               {id}
             </button>
           ))}
@@ -1262,15 +1164,7 @@ function RelatedList({
   )
 }
 
-export function DetailsView({
-  ticket,
-  ticketById,
-  onSelect,
-}: {
-  ticket?: DerivedTicket
-  ticketById: Map<string, DerivedTicket>
-  onSelect: (id: string) => void
-}) {
+export function DetailsView({ ticket, ticketById, onSelect }: { ticket?: DerivedTicket; ticketById: Map<string, DerivedTicket>; onSelect: (id: string) => void }) {
   if (!ticket) return <div className="empty-state">Select a ticket in Graph or Kanban to open its full details.</div>
 
   return (
@@ -1278,23 +1172,45 @@ export function DetailsView({
       <header className="details-header">
         <div>
           <h2>{ticket.title}</h2>
-          <div className="details-subtitle" title={getTicketHoverText(ticket)}>{ticket.id}</div>
+          <div className="details-subtitle" title={getTicketHoverText(ticket)}>
+            {ticket.id}
+          </div>
         </div>
         <StatusBadge ticket={ticket} />
       </header>
 
       <div className="meta-grid">
-        <div><strong>Type</strong><span>{ticket.type || '—'}</span></div>
-        <div><strong>Priority</strong><span>{ticket.priority ?? '—'}</span></div>
-        <div><strong>Assignee</strong><span>{ticket.assignee || '—'}</span></div>
-        <div><strong>Created</strong><span>{ticket.created || '—'}</span></div>
-        <div><strong>Ready</strong><span>{ticket.ready ? 'yes' : 'no'}</span></div>
-        <div><strong>File</strong><span>{ticket.filePath}</span></div>
+        <div>
+          <strong>Type</strong>
+          <span>{ticket.type || '—'}</span>
+        </div>
+        <div>
+          <strong>Priority</strong>
+          <span>{ticket.priority ?? '—'}</span>
+        </div>
+        <div>
+          <strong>Assignee</strong>
+          <span>{ticket.assignee || '—'}</span>
+        </div>
+        <div>
+          <strong>Created</strong>
+          <span>{ticket.created || '—'}</span>
+        </div>
+        <div>
+          <strong>Ready</strong>
+          <span>{ticket.ready ? 'yes' : 'no'}</span>
+        </div>
+        <div>
+          <strong>File</strong>
+          <span>{ticket.filePath}</span>
+        </div>
       </div>
 
       <div className="tag-row">
         {ticket.tags.map((tag) => (
-          <span key={tag} className="badge tag">{tag}</span>
+          <span key={tag} className="badge tag">
+            {tag}
+          </span>
         ))}
       </div>
 
@@ -1317,6 +1233,7 @@ export function AgentOverlay({
   toolActivity,
   onSendPrompt,
   onAbort,
+  onRefreshState,
   onClose,
   fullscreen = false,
   returnToLabel,
@@ -1327,6 +1244,7 @@ export function AgentOverlay({
   toolActivity: ToolActivityEntry[]
   onSendPrompt: (text: string) => Promise<void>
   onAbort: () => Promise<void>
+  onRefreshState: () => Promise<void>
   onClose: () => void
   fullscreen?: boolean
   returnToLabel?: TabKey
@@ -1334,18 +1252,14 @@ export function AgentOverlay({
   const closeLabel = returnToLabel ? `Back to ${returnToLabel}` : 'Close'
 
   return (
-    <div
-      className={`agent-overlay ${fullscreen ? 'agent-overlay-fullscreen' : ''}`}
-      data-awb="agent-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Agent panel overlay"
-    >
+    <div className={`agent-overlay ${fullscreen ? 'agent-overlay-fullscreen' : ''}`} data-awb="agent-overlay" role="dialog" aria-modal="true" aria-label="Agent panel overlay">
       <button type="button" data-awb="agent-overlay-backdrop" className="agent-overlay-backdrop" aria-label="Close agent panel" onClick={onClose} />
       <div className="agent-overlay-sheet">
         <div className="agent-overlay-header">
           <strong>Agent</strong>
-          <button type="button" data-awb="agent-overlay-close" className="secondary-button" onClick={onClose}>{closeLabel}</button>
+          <button type="button" data-awb="agent-overlay-close" className="secondary-button" onClick={onClose}>
+            {closeLabel}
+          </button>
         </div>
         <AgentPanel
           ticket={ticket}
@@ -1354,6 +1268,7 @@ export function AgentOverlay({
           toolActivity={toolActivity}
           onSendPrompt={onSendPrompt}
           onAbort={onAbort}
+          onRefreshState={onRefreshState}
         />
       </div>
     </div>

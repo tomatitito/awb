@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 
 const PAUSE_UNAVAILABLE_REASON = 'Pause is not yet supported by the current agent runtime. Closing the panel will keep the current run active.'
-import type { DerivedTicket } from '../core/types'
+
 import type { AgentPanelState } from '../agent/types'
+import type { DerivedTicket } from '../core/types'
+import { AgentLoginSection } from './AgentLoginSection'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
 
 function formatStatusLabel(status: AgentPanelState['status']): string {
@@ -31,6 +33,7 @@ export function AgentPanel({
   toolActivity,
   onSendPrompt,
   onAbort,
+  onRefreshState,
 }: {
   ticket?: DerivedTicket
   state: AgentPanelState
@@ -38,6 +41,7 @@ export function AgentPanel({
   toolActivity: ToolActivityEntry[]
   onSendPrompt: (text: string) => Promise<void>
   onAbort: () => Promise<void>
+  onRefreshState: () => Promise<void>
 }) {
   const [promptText, setPromptText] = useState('Implement the selected ticket.')
   const [actionError, setActionError] = useState<string | undefined>()
@@ -68,11 +72,15 @@ export function AgentPanel({
         </div>
       </div>
 
+      <AgentLoginSection authProviders={state.authProviders ?? []} loginFlow={state.loginFlow} onRefreshState={onRefreshState} />
+
       <section className="agent-panel-section">
         <strong>Context</strong>
         {ticket ? (
           <>
-            <div className="agent-panel-ticket-title">{ticket.id} — {ticket.title}</div>
+            <div className="agent-panel-ticket-title">
+              {ticket.id} — {ticket.title}
+            </div>
             <div className="agent-panel-ticket-meta">
               <span className="badge tag">{ticket.status || 'unknown'}</span>
               {ticket.priority !== undefined ? <span>P{ticket.priority}</span> : null}
@@ -131,12 +139,7 @@ export function AgentPanel({
         }}
       >
         <strong>Prompt</strong>
-        <textarea
-          value={promptText}
-          onChange={(event) => setPromptText(event.target.value)}
-          placeholder="Ask the agent what to do next"
-          rows={5}
-        />
+        <textarea value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Ask the agent what to do next" rows={5} />
         <div className="agent-run-controls" aria-label="Agent execution controls">
           <button type="submit" data-awb="agent-send" className="primary-button" disabled={state.status === 'connecting' || state.isStreaming}>
             Send
@@ -155,14 +158,7 @@ export function AgentPanel({
           >
             Stop
           </button>
-          <button
-            type="button"
-            data-awb="agent-pause"
-            className="secondary-button"
-            disabled
-            title={PAUSE_UNAVAILABLE_REASON}
-            aria-disabled="true"
-          >
+          <button type="button" data-awb="agent-pause" className="secondary-button" disabled title={PAUSE_UNAVAILABLE_REASON} aria-disabled="true">
             Pause
           </button>
         </div>

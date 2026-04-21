@@ -51,6 +51,11 @@ export function useAgentPanel() {
   const [toolActivity, setToolActivity] = useState<ToolActivityEntry[]>([])
   const eventSourceRef = useRef<EventSource | null>(null)
 
+  const refreshState = useCallback(async () => {
+    const nextState = await fetchAgentState()
+    setState(nextState)
+  }, [])
+
   useEffect(() => {
     let disposed = false
 
@@ -87,10 +92,7 @@ export function useAgentPanel() {
           setTranscript((current) => {
             const last = current[current.length - 1]
             if (last?.kind === 'assistant' && last.isStreaming) {
-              return [
-                ...current.slice(0, -1),
-                { ...last, text: `${last.text}${event.delta}`, timestamp: event.timestamp },
-              ]
+              return [...current.slice(0, -1), { ...last, text: `${last.text}${event.delta}`, timestamp: event.timestamp }]
             }
 
             return [
@@ -146,16 +148,18 @@ export function useAgentPanel() {
           ])
           return
         case 'tool-end':
-          setToolActivity((current) => current.map((entry) => (
-            entry.toolCallId === event.toolCallId
-              ? {
-                  ...entry,
-                  completedAt: Date.now(),
-                  isError: event.isError,
-                  preview: stringifyPreview(event.result) ?? entry.preview,
-                }
-              : entry
-          )))
+          setToolActivity((current) =>
+            current.map((entry) =>
+              entry.toolCallId === event.toolCallId
+                ? {
+                    ...entry,
+                    completedAt: Date.now(),
+                    isError: event.isError,
+                    preview: stringifyPreview(event.result) ?? entry.preview,
+                  }
+                : entry,
+            ),
+          )
           return
         case 'queue-update':
           setState((current) => ({
@@ -188,16 +192,7 @@ export function useAgentPanel() {
       if (payload) applyEvent(payload)
     }
 
-    const eventNames: AgentPanelEvent['type'][] = [
-      'ready',
-      'agent-state',
-      'assistant-text-delta',
-      'assistant-message-complete',
-      'tool-start',
-      'tool-end',
-      'queue-update',
-      'error',
-    ]
+    const eventNames: AgentPanelEvent['type'][] = ['ready', 'agent-state', 'assistant-text-delta', 'assistant-message-complete', 'tool-start', 'tool-end', 'queue-update', 'error']
 
     for (const eventName of eventNames) {
       eventSource.addEventListener(eventName, handleEvent as EventListener)
@@ -242,5 +237,6 @@ export function useAgentPanel() {
     sendPrompt,
     abort,
     setSelectedTicketContext,
+    refreshState,
   }
 }
