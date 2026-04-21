@@ -1,11 +1,13 @@
-import express from 'express'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
+import type { Server, ServerResponse } from 'node:http'
 import path from 'node:path'
-import type { ServerResponse } from 'node:http'
-import type { Server } from 'node:http'
 import { fileURLToPath } from 'node:url'
+import { AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
+import express from 'express'
 import { AgentController, toLegacyPanelEvent } from './agent/AgentController.js'
+import { createPiSession } from './agent/createPiSession.js'
+import { LoginController } from './agent/LoginController.js'
 import type { AgentRunEvent, SelectedTicketContext } from './agent/types.js'
 import { loadTickets } from './core/loadTickets.js'
 
@@ -28,7 +30,17 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   const legacyAgentClients = new Set<ServerResponse>()
   const allRunClients = new Set<ServerResponse>()
   const runClients = new Map<string, Set<ServerResponse>>()
-  const agentController = new AgentController(options.projectDir)
+  const authStorage = AuthStorage.create()
+  const modelRegistry = ModelRegistry.create(authStorage)
+  const now = () => Date.now()
+  const agentController = new AgentController(options.projectDir, {
+    createSession: createPiSession,
+    createRunId: () => crypto.randomUUID(),
+    now,
+    loginController: new LoginController({ authStorage, modelRegistry, now }),
+    credentialProvider: authStorage,
+    modelRegistry,
+  })
   let reloadTimer: ReturnType<typeof setTimeout> | undefined
 
   const notifyClients = (event: 'reload' | 'reload-error', payload: Record<string, unknown>) => {
@@ -228,7 +240,8 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     }
   })
 
-  app.get('/api/agent/state', (_request, response) => {
+  app.get('/api/agent/state', async (_request, response) => {
+    await agentController.ensureStarted()
     response.json(agentController.getState())
   })
 
@@ -286,6 +299,48 @@ export async function startServer(options: StartServerOptions): Promise<{ server
       const message = error instanceof Error ? error.message : String(error)
       response.status(500).json({ message })
     }
+  })
+
+  app.get('/api/agent/auth/providers', async (_request, response) => {
+    await agentController.ensureStarted()
+    response.json({ providers: agentController.getAuthProviders() })
+  })
+
+  app.post('/api/agent/auth/login', async (request, response) => {
+    const providerId = typeof request.body?.providerId === 'string' ? request.body.providerId.trim() : ''
+    if (!providerId) {
+      response.status(400).json({ message: 'providerId is required.' })
+      return
+    }
+
+    try {
+      const flow = await agentController.startLogin(providerId)
+      response.status(202).json({ flow })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      response.status(409).json({ message })
+    }
+  })
+
+  app.get('/api/agent/auth/login', (_request, response) => {
+    response.json({ flow: agentController.getLoginFlow() })
+  })
+
+  app.post('/api/agent/auth/login/input', async (request, response) => {
+    const value = typeof request.body?.value === 'string' ? request.body.value : ''
+
+    try {
+      await agentController.submitLoginInput(value)
+      response.status(202).json({ ok: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      response.status(409).json({ message })
+    }
+  })
+
+  app.post('/api/agent/auth/login/cancel', async (_request, response) => {
+    await agentController.cancelLogin()
+    response.status(202).json({ ok: true })
   })
 
   let closeWebDevServer: (() => Promise<void>) | undefined

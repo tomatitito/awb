@@ -1,7 +1,26 @@
 import { describe, expect, test } from 'bun:test'
 import type { AgentSession, AgentSessionEvent } from '@mariozechner/pi-coding-agent'
 import { AgentController } from '../../src/agent/AgentController'
+import { LoginController } from '../../src/agent/LoginController'
 import type { TicketRunContext } from '../../src/agent/types'
+
+const stubAuthStorage = {
+  get: () => undefined,
+  getOAuthProviders: () => [],
+} as any
+
+const stubCredentialProvider = {
+  get: () => undefined,
+  getApiKey: async () => undefined,
+  has: () => false,
+  hasAuth: () => false,
+}
+
+const stubModelRegistry = {
+  refresh: () => {},
+  getAll: () => [],
+  hasConfiguredAuth: () => false,
+} as any
 
 function makeTicket(overrides: Partial<TicketRunContext> & { ticketId: string }): TicketRunContext {
   return {
@@ -54,13 +73,17 @@ describe('AgentController', () => {
     const secondSession = createMockSession()
     const sessions = [firstSession, secondSession]
     let runNumber = 0
+    const now = (() => {
+      let current = 1000
+      return () => ++current
+    })()
     const controller = new AgentController('/project', {
       createSession: async () => ({ session: sessions.shift()!.session }),
       createRunId: () => `run-${++runNumber}`,
-      now: (() => {
-        let current = 1000
-        return () => ++current
-      })(),
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
     })
 
     const firstTicket = makeTicket({
@@ -97,13 +120,17 @@ describe('AgentController', () => {
 
   test('records transcript and tool activity on a specific run', async () => {
     const mockSession = createMockSession()
+    const now = (() => {
+      let current = 2000
+      return () => ++current
+    })()
     const controller = new AgentController('/project', {
       createSession: async () => ({ session: mockSession.session }),
       createRunId: () => 'run-1',
-      now: (() => {
-        let current = 2000
-        return () => ++current
-      })(),
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
     })
 
     const run = await controller.createRun(makeTicket({ ticketId: 'awb-1', body: 'Do the thing.' }))
@@ -155,13 +182,17 @@ describe('AgentController', () => {
 
   test('aborts a run and keeps it available in memory', async () => {
     const mockSession = createMockSession()
+    const now = (() => {
+      let current = 3000
+      return () => ++current
+    })()
     const controller = new AgentController('/project', {
       createSession: async () => ({ session: mockSession.session }),
       createRunId: () => 'run-1',
-      now: (() => {
-        let current = 3000
-        return () => ++current
-      })(),
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
     })
 
     const run = await controller.createRun(makeTicket({ ticketId: 'awb-1' }))
