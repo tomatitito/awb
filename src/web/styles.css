@@ -21,7 +21,7 @@
   --code-bg: rgba(0, 0, 0, 0.28);
   --line-height: 18px;
 
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   background: var(--body-bg);
   color: var(--text);
 }
@@ -51,25 +51,29 @@ select {
   font: inherit;
 }
 
-[role='button'] {
+[role="button"] {
   outline: none;
 }
 
 button {
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
 }
 
 button:hover,
 input:hover,
 select:hover,
-[role='button']:hover {
+[role="button"]:hover {
   border-color: var(--text);
 }
 
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-[role='button']:focus-visible {
+[role="button"]:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
@@ -666,11 +670,11 @@ select:focus-visible,
 
 .graph-canvas {
   overflow: auto;
-  background:
-    linear-gradient(rgba(128, 128, 128, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(128, 128, 128, 0.05) 1px, transparent 1px),
-    var(--body-bg);
-  background-size: 24px 24px, 24px 24px, auto;
+  background: linear-gradient(rgba(128, 128, 128, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(128, 128, 128, 0.05) 1px, transparent 1px), var(--body-bg);
+  background-size:
+    24px 24px,
+    24px 24px,
+    auto;
 }
 
 .graph-stage {
@@ -692,7 +696,7 @@ select:focus-visible,
 .graph-layer-label {
   fill: var(--muted);
   font-size: 10px;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
 }
 
 .graph-edge {
@@ -764,7 +768,11 @@ select:focus-visible,
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
 }
 
 .graph-ticket-card:hover,
@@ -776,7 +784,9 @@ select:focus-visible,
 
 .graph-ticket-card.selected {
   border-color: var(--text);
-  box-shadow: 0 0 0 1px var(--text), 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    0 0 0 1px var(--text),
+    0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .graph-ticket-card.ready {
@@ -794,7 +804,9 @@ select:focus-visible,
 
 .graph-ticket-card.search-match {
   border-color: var(--border);
-  box-shadow: 0 0 0 1px var(--border), 0 10px 24px rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
 .graph-ticket-card-top,
@@ -829,7 +841,6 @@ select:focus-visible,
   line-height: 1;
 }
 
-
 .agent-run-button.disabled {
   border-color: var(--dim);
   background: rgba(128, 128, 128, 0.12);
@@ -855,7 +866,9 @@ select:focus-visible,
 }
 
 .graph-ticket-card.related-context {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(16, 163, 127, 0.16);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(16, 163, 127, 0.16);
 }
 
 .graph-ticket-card.related-target {
@@ -1405,7 +1418,9 @@ select:focus-visible,
 
 .agents-run-row.selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 14px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 0 0 1px var(--accent) inset,
+    0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .agents-run-row-top {

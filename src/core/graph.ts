@@ -237,10 +237,7 @@ function deriveCriticalPath(nodes: string[], incoming: Map<string, string[]>, ou
       const candidateDistance = (distances.get(nodeId) ?? 0) + 1
       const currentDistance = distances.get(nextId) ?? 0
       const currentPrevious = previous.get(nextId)
-      if (
-        candidateDistance > currentDistance ||
-        (candidateDistance === currentDistance && currentPrevious !== undefined && nodeId.localeCompare(currentPrevious) < 0)
-      ) {
+      if (candidateDistance > currentDistance || (candidateDistance === currentDistance && currentPrevious !== undefined && nodeId.localeCompare(currentPrevious) < 0)) {
         distances.set(nextId, candidateDistance)
         previous.set(nextId, nodeId)
       } else if (candidateDistance === currentDistance && currentPrevious === undefined) {
@@ -347,11 +344,7 @@ function compactVisibleNodes(nodes: GraphNodeLayout[]): GraphNodeLayout[] {
   return nodes.map((node) => compactedById.get(node.id) ?? node)
 }
 
-export function deriveVisibleGraph(
-  graph: GraphDerivation,
-  visibleTickets: DerivedTicket[],
-  selectedTicket?: DerivedTicket,
-): VisibleGraphDerivation {
+export function deriveVisibleGraph(graph: GraphDerivation, visibleTickets: DerivedTicket[], selectedTicket?: DerivedTicket): VisibleGraphDerivation {
   if (graph.hasCycle) {
     return {
       hasCycle: true,
@@ -368,17 +361,10 @@ export function deriveVisibleGraph(
   const selectedDependencies = new Set(selectedTicket?.blockedBy ?? [])
   const selectedDependents = new Set(selectedTicket?.unblocks ?? [])
   const nodes = compactVisibleNodes(graph.nodes.filter((node) => visibleIds.has(node.id)))
-  const dependencyEdges = graph.dependencyEdges.filter(
-    (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
-  )
+  const dependencyEdges = graph.dependencyEdges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target))
   const relatedEdges: GraphRelatedEdge[] = selectedTicket
     ? Array.from(selectedLinks)
-        .filter((target) => (
-          target !== selectedTicket.id &&
-          visibleIds.has(target) &&
-          !selectedDependencies.has(target) &&
-          !selectedDependents.has(target)
-        ))
+        .filter((target) => target !== selectedTicket.id && visibleIds.has(target) && !selectedDependencies.has(target) && !selectedDependents.has(target))
         .sort(compareIds)
         .map((target) => ({
           id: `${selectedTicket.id}~>${target}`,

@@ -44,11 +44,7 @@ function createFilterCriteria(selectedTicket: DerivedTicket | undefined, filters
   }
 }
 
-function matchesNonEpicFilters(
-  ticket: DerivedTicket,
-  filters: SidebarFilters,
-  criteria: ReturnType<typeof createFilterCriteria>,
-): boolean {
+function matchesNonEpicFilters(ticket: DerivedTicket, filters: SidebarFilters, criteria: ReturnType<typeof createFilterCriteria>): boolean {
   if (criteria.statusFilter.size > 0 && !criteria.statusFilter.has(normalizeFilterValue(ticket.status))) return false
   if (filters.linkedOnly && !criteria.linkedIds.has(ticket.id)) return false
   if (filters.dependentOnly && !criteria.dependencyIds.has(ticket.id)) return false
@@ -60,25 +56,15 @@ export function isUngroupedEpicFilter(epicId: string): boolean {
 }
 
 export function getEpicTickets(tickets: DerivedTicket[]): DerivedTicket[] {
-  return tickets
-    .filter((ticket) => isEpicTicket(ticket))
-    .sort((left, right) => left.id.localeCompare(right.id))
+  return tickets.filter((ticket) => isEpicTicket(ticket)).sort((left, right) => left.id.localeCompare(right.id))
 }
 
-export function getVisibleTickets(
-  tickets: DerivedTicket[],
-  selectedTicket: DerivedTicket | undefined,
-  filters: SidebarFilters,
-): DerivedTicket[] {
+export function getVisibleTickets(tickets: DerivedTicket[], selectedTicket: DerivedTicket | undefined, filters: SidebarFilters): DerivedTicket[] {
   const criteria = createFilterCriteria(selectedTicket, filters)
   return tickets.filter((ticket) => matchesNonEpicFilters(ticket, filters, criteria) && matchesSharedEpicFilter(ticket, filters.epicId))
 }
 
-export function getVisibleKanbanTickets(
-  tickets: DerivedTicket[],
-  selectedTicket: DerivedTicket | undefined,
-  filters: SidebarFilters,
-): DerivedTicket[] {
+export function getVisibleKanbanTickets(tickets: DerivedTicket[], selectedTicket: DerivedTicket | undefined, filters: SidebarFilters): DerivedTicket[] {
   const criteria = createFilterCriteria(selectedTicket, filters)
 
   return tickets.filter((ticket) => {
