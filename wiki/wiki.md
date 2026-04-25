@@ -4,6 +4,7 @@ See also:
 - [AWB agent panel implementation plan](./agent-panel-implementation-plan.md)
 - [AWB pi SDK agent panel design](./pi-sdk-agent-panel-design.md)
 - [AWB agent panel architecture](./agent-panel-architecture.md)
+- [Deferred design: per-run git worktree isolation](./agent-run-worktree-isolation.md)
 
 A pattern for building personal knowledge bases using LLMs.
 

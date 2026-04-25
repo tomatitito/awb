@@ -38,6 +38,20 @@ export type AgentRunTranscript = {
   updatedAt: number
 }
 
+export type AgentRunWorktreeState = {
+  mode: 'shared-project' | 'git-worktree'
+  status: 'not-requested' | 'provisioning' | 'ready' | 'cleanup-pending' | 'cleaning' | 'cleaned' | 'failed'
+  path?: string
+  branch?: string
+  baseRef?: string
+  headSha?: string
+  createdAt?: number
+  lastCheckedAt?: number
+  cleanupStartedAt?: number
+  cleanedAt?: number
+  cleanupError?: string
+}
+
 export type AgentRunState = {
   id: string
   ticket: TicketRunContext
@@ -57,11 +71,7 @@ export type AgentRunState = {
     id: string
   }
   lastError?: string
-  worktree?: {
-    path?: string
-    branch?: string
-    baseRef?: string
-  }
+  worktree?: AgentRunWorktreeState
 }
 
 export type AgentRunEvent =

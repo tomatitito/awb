@@ -107,6 +107,14 @@ describe('AgentController', () => {
     expect(controller.listRuns().map((run) => run.id)).toEqual(['run-2', 'run-1'])
     expect(controller.getRun(firstRun.id)?.ticket).toEqual(firstTicket)
     expect(controller.getRun(secondRun.id)?.ticket).toEqual(secondTicket)
+    expect(controller.getRun(firstRun.id)?.worktree).toEqual({
+      mode: 'shared-project',
+      status: 'not-requested',
+    })
+    expect(controller.getRun(secondRun.id)?.worktree).toEqual({
+      mode: 'shared-project',
+      status: 'not-requested',
+    })
 
     expect(firstSession.promptCalls[0]).toContain('Use red/green TDD to implement this ticket.')
     expect(firstSession.promptCalls[0]).toContain('Ticket ID: awb-1')

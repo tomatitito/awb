@@ -153,7 +153,10 @@ export class AgentController {
       },
       queuedSteeringCount: 0,
       queuedFollowUpCount: 0,
-      worktree: {},
+      worktree: {
+        mode: 'shared-project',
+        status: 'not-requested',
+      },
     }
 
     this.runs.set(runId, { run })
