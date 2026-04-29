@@ -183,10 +183,12 @@ export class AgentController {
     })
     record.run.updatedAt = timestamp
     record.run.transcript.updatedAt = timestamp
+    const entry = record.run.transcript.entries[record.run.transcript.entries.length - 1]
+    if (!entry) throw new Error(`Run ${runId} is missing the newly added transcript entry.`)
     this.emit({
       type: 'run-output',
       runId,
-      entry: record.run.transcript.entries[record.run.transcript.entries.length - 1]!,
+      entry,
     })
     this.emitRunUpdated(record.run)
     await record.session.prompt(userText)

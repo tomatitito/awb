@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { AgentSession, AgentSessionEvent } from '@mariozechner/pi-coding-agent'
+import type { AgentSession, AgentSessionEvent, AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import { AgentController } from '../../src/agent/AgentController'
 import { LoginController } from '../../src/agent/LoginController'
 import type { TicketRunContext } from '../../src/agent/types'
@@ -7,7 +7,7 @@ import type { TicketRunContext } from '../../src/agent/types'
 const stubAuthStorage = {
   get: () => undefined,
   getOAuthProviders: () => [],
-} as any
+} as unknown as AuthStorage
 
 const stubCredentialProvider = {
   get: () => undefined,
@@ -20,7 +20,7 @@ const stubModelRegistry = {
   refresh: () => {},
   getAll: () => [],
   hasConfiguredAuth: () => false,
-} as any
+} as unknown as ModelRegistry
 
 function makeTicket(overrides: Partial<TicketRunContext> & { ticketId: string }): TicketRunContext {
   return {
@@ -78,7 +78,11 @@ describe('AgentController', () => {
       return () => ++current
     })()
     const controller = new AgentController('/project', {
-      createSession: async () => ({ session: sessions.shift()!.session }),
+      createSession: async () => {
+        const nextSession = sessions.shift()
+        if (!nextSession) throw new Error('Expected a mock session to be available.')
+        return { session: nextSession.session }
+      },
       createRunId: () => `run-${++runNumber}`,
       now,
       loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
@@ -182,9 +186,7 @@ describe('AgentController', () => {
       ['assistant', 'Hello world'],
       ['user', 'Please add a regression test.'],
     ])
-    expect(next?.transcript.toolActivity).toEqual([
-      expect.objectContaining({ toolCallId: 'tool-1', toolName: 'read', isError: false }),
-    ])
+    expect(next?.transcript.toolActivity).toEqual([expect.objectContaining({ toolCallId: 'tool-1', toolName: 'read', isError: false })])
     expect(mockSession.promptCalls.at(-1)).toBe('Please add a regression test.')
   })
 
