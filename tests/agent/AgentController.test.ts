@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { AgentSession, AgentSessionEvent, AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import { AgentController } from '../../src/agent/AgentController'
 import { LoginController } from '../../src/agent/LoginController'
-import type { TicketRunContext } from '../../src/agent/types'
+import type { TicketRunContext, AgentRunWorktreeState } from '../../src/agent/types'
 
 const stubAuthStorage = {
   get: () => undefined,
@@ -63,6 +63,28 @@ function createMockSession() {
       if (event.type === 'agent_start') isStreaming = true
       if (event.type === 'agent_end') isStreaming = false
       for (const listener of listeners) listener(event)
+    },
+  }
+}
+
+function createMockWorktreeManager(worktree?: AgentRunWorktreeState) {
+  const calls: string[] = []
+  return {
+    enabled: Boolean(worktree),
+    calls,
+    async reconcileStaleWorktrees() {},
+    async provision(runId: string) {
+      calls.push(`provision:${runId}`)
+      if (!worktree) throw new Error('worktree manager disabled')
+      return worktree
+    },
+    async cleanup(current: AgentRunWorktreeState) {
+      calls.push(`cleanup:${current.path ?? 'unknown'}`)
+      return {
+        ...current,
+        status: 'cleaned',
+        cleanedAt: 9999,
+      }
     },
   }
 }
@@ -188,6 +210,105 @@ describe('AgentController', () => {
     ])
     expect(next?.transcript.toolActivity).toEqual([expect.objectContaining({ toolCallId: 'tool-1', toolName: 'read', isError: false })])
     expect(mockSession.promptCalls.at(-1)).toBe('Please add a regression test.')
+  })
+
+  test('provisions a worktree before creating the session when isolation is enabled', async () => {
+    const mockSession = createMockSession()
+    const worktreeManager = createMockWorktreeManager({
+      mode: 'git-worktree',
+      status: 'ready',
+      path: '/project/.awb/worktrees/run-1',
+      branch: 'awb/run/run-1',
+      baseRef: 'HEAD',
+      headSha: 'abc123',
+      createdAt: 1002,
+      lastCheckedAt: 1002,
+    })
+    const calls: string[] = []
+    const now = (() => {
+      let current = 1000
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async (_projectDir, options) => {
+        calls.push(`session:${options.cwd}`)
+        return { session: mockSession.session }
+      },
+      createRunId: () => 'run-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      worktreeManager,
+    })
+
+    await controller.createRun(makeTicket({ ticketId: 'awb-1' }))
+    await Promise.resolve()
+
+    expect(worktreeManager.calls).toEqual(['provision:run-1'])
+    expect(calls).toEqual(['session:/project/.awb/worktrees/run-1'])
+    expect(controller.getRun('run-1')?.worktree).toEqual(expect.objectContaining({
+      mode: 'git-worktree',
+      status: 'ready',
+      path: '/project/.awb/worktrees/run-1',
+      branch: 'awb/run/run-1',
+    }))
+  })
+
+  test('retains successful worktrees and cleans up failed ones', async () => {
+    const completedSession = createMockSession()
+    const failedSession = createMockSession()
+    const sessions = [completedSession, failedSession]
+    let runNumber = 0
+    const worktreeManager = createMockWorktreeManager({
+      mode: 'git-worktree',
+      status: 'ready',
+      path: '/project/.awb/worktrees/run',
+      branch: 'awb/run/run',
+      baseRef: 'HEAD',
+      headSha: 'abc123',
+      createdAt: 1002,
+      lastCheckedAt: 1002,
+    })
+    const now = (() => {
+      let current = 4000
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => {
+        const next = sessions.shift()
+        if (!next) throw new Error('missing session')
+        return { session: next.session }
+      },
+      createRunId: () => `run-${++runNumber}`,
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      worktreeManager,
+    })
+
+    const completedRun = await controller.createRun(makeTicket({ ticketId: 'awb-1' }))
+    const failedRun = await controller.createRun(makeTicket({ ticketId: 'awb-2' }))
+    await Promise.resolve()
+    completedSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    completedSession.emit({ type: 'agent_end' } as AgentSessionEvent)
+    failedSession.emit({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        timestamp: 4100,
+        content: [{ type: 'text', text: 'failed' }],
+        errorMessage: 'boom',
+      },
+    } as AgentSessionEvent)
+    await Promise.resolve()
+
+    expect(controller.getRun(completedRun.id)?.status).toBe('completed')
+    expect(controller.getRun(completedRun.id)?.worktree?.status).toBe('ready')
+    expect(controller.getRun(failedRun.id)?.status).toBe('failed')
+    expect(controller.getRun(failedRun.id)?.worktree?.status).toBe('cleaned')
+    expect(worktreeManager.calls).toContain('cleanup:/project/.awb/worktrees/run')
   })
 
   test('aborts a run and keeps it available in memory', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentRunEvent, AgentRunState } from '../agent/types'
 import { deriveVisibleGraph } from '../core/graph'
 import type { AppData } from '../core/types'
-import { abortSpecificAgentRun, createAgentRun, listAgentRuns, sendAgentRunPrompt } from './agentApi'
+import { abortSpecificAgentRun, cleanupAgentRunWorktree, createAgentRun, listAgentRuns, openAgentRunWorktree, sendAgentRunPrompt } from './agentApi'
 import { createDefaultSidebarFilters, getAvailableStatuses, getEpicTickets, getVisibleKanbanTickets, getVisibleTickets, type SidebarFilters } from './filtering'
 import { ResponsiveWorkspaceLayout } from './layouts'
 import { openAgentPanelFromHeader } from './mobileFlow'
@@ -245,6 +245,11 @@ export default function App() {
       onBackToAgentsList={() => setSelectedAgentRunId(undefined)}
       onSendAgentRunPrompt={sendAgentRunPrompt}
       onAbortAgentRun={abortSpecificAgentRun}
+      onOpenAgentRunWorktree={openAgentRunWorktree}
+      onCleanupAgentRunWorktree={async (runId) => {
+        const run = await cleanupAgentRunWorktree(runId)
+        setAgentRuns((current) => current.map((candidate) => (candidate.id === run.id ? run : candidate)))
+      }}
       selectedId={selectedId}
       onSelectTicket={(id) => setSelectedId(id)}
       dataStats={data.stats}

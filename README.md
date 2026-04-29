@@ -48,6 +48,7 @@ awb --tickets-dir .tickets
 awb --port 4312
 awb --no-open
 awb --dev
+awb --editor "code -n"
 ```
 
 ## Current UI
@@ -56,6 +57,29 @@ awb --dev
 - **Kanban**: tickets grouped by status
 - **Details**: full ticket metadata and markdown body
 - **Agent panel**: server-embedded pi SDK session with SSE-driven transcript and tool activity
+
+## Configuration
+
+AWB reads optional project config from `<project>/.awb/config.json`.
+
+Example:
+
+```json
+{
+  "editor": "code -n",
+  "agentRuns": {
+    "worktreeIsolation": true
+  }
+}
+```
+
+Editor command precedence is:
+
+1. `--editor`
+2. `AWB_EDITOR`
+3. `.awb/config.json`
+
+When worktree isolation is enabled, background agent runs use dedicated git worktrees under `.awb/worktrees/<run-id>` and the Agents UI can open retained worktrees in the configured editor.
 
 ## Agent panel requirements
 

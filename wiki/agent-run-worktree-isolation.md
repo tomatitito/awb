@@ -108,12 +108,15 @@ Recommended behavior:
 
 - keep run metadata and transcript history in AWB even after worktree cleanup
 - treat cleanup as a separate lifecycle step from run completion
-- allow cleanup to happen immediately, lazily, or via a future janitor pass
+- retain successful run worktrees by default so users can inspect, diff, test, or commit their changes after the run ends
+- reserve automatic cleanup for failed runs and orphaned worktrees
+- allow manual cleanup for successful retained worktrees
+- do not expire successful retained worktrees automatically
 
 Likely cleanup triggers:
 
-- after run completion, failure, or abort
-- on explicit user action in future UI
+- on explicit user action in the UI for a completed successful run
+- after failure when policy allows automatic cleanup
 - on server startup via stale-worktree reconciliation
 
 Likely cleanup steps:
@@ -123,6 +126,24 @@ Likely cleanup steps:
 3. remove the worktree directory with `git worktree remove`
 4. optionally delete the dedicated branch when policy allows it
 5. mark `worktree.status = "cleaned"` and set `cleanedAt`
+
+## Run inspection and editor integration
+
+A retained worktree is only useful if the user can get to it quickly.
+
+Recommended behavior:
+
+- show the run's worktree path and branch in the Agents UI when available
+- expose an `Open in editor` action for retained worktrees
+- have that action open the editor on the user's local machine via the AWB server process
+- make the editor a general AWB setting configurable from multiple sources: project config file, `AWB_EDITOR`, and the `--editor` CLI flag
+- use configuration precedence of: `--editor` > `AWB_EDITOR` > config file
+- treat the editor setting as a command string executed through a shell
+- invoke the configured command with the worktree path as the target
+- do not assume a built-in default editor
+- if no editor is configured, disable the action or surface a clear error explaining how to configure one
+
+This keeps successful runs reviewable without forcing users to locate the checkout manually.
 
 ## Failure and crash scenarios
 
@@ -183,7 +204,8 @@ With dedicated worktrees, AWB can later support:
 
 - multiple active runs against the same repo without shared-checkout conflicts
 - rerunning the same ticket in a fresh checkout
-- opening or diffing a specific run's changes
+- opening a specific run in the user's editor
+- diffing a specific run's changes
 - future policies like max active worktrees or disk-budget cleanup
 
 But none of those should be required for the initial multi-run release.

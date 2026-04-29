@@ -9,6 +9,7 @@ import { AgentController, toLegacyPanelEvent } from './agent/AgentController.js'
 import { createPiSession } from './agent/createPiSession.js'
 import { LoginController } from './agent/LoginController.js'
 import type { AgentRunEvent, SelectedTicketContext } from './agent/types.js'
+import { GitWorktreeManager } from './agent/worktree.js'
 import { loadTickets } from './core/loadTickets.js'
 
 export type StartServerOptions = {
@@ -16,6 +17,8 @@ export type StartServerOptions = {
   ticketsDir: string
   port: number
   dev?: boolean
+  editorCommand?: string
+  worktreeIsolationEnabled?: boolean
 }
 
 export async function startServer(options: StartServerOptions): Promise<{ server: Server; url: string }> {
@@ -33,6 +36,10 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   const authStorage = AuthStorage.create()
   const modelRegistry = ModelRegistry.create(authStorage)
   const now = () => Date.now()
+  const worktreeManager = new GitWorktreeManager(options.projectDir, {
+    enabled: Boolean(options.worktreeIsolationEnabled),
+    now,
+  })
   const agentController = new AgentController(options.projectDir, {
     createSession: createPiSession,
     createRunId: () => crypto.randomUUID(),
@@ -40,7 +47,10 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     loginController: new LoginController({ authStorage, modelRegistry, now }),
     credentialProvider: authStorage,
     modelRegistry,
+    worktreeManager,
+    editorCommand: options.editorCommand,
   })
+  await agentController.ensureStarted()
   let reloadTimer: ReturnType<typeof setTimeout> | undefined
 
   const notifyClients = (event: 'reload' | 'reload-error', payload: Record<string, unknown>) => {
@@ -233,6 +243,28 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     try {
       await agentController.abortRun(request.params.runId)
       response.status(202).json({ ok: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const status = message.includes('not found') ? 404 : 409
+      response.status(status).json({ message })
+    }
+  })
+
+  app.post('/api/agent/runs/:runId/worktree/open', async (request, response) => {
+    try {
+      await agentController.openRunWorktreeInEditor(request.params.runId)
+      response.status(202).json({ ok: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const status = message.includes('not found') ? 404 : 409
+      response.status(status).json({ message })
+    }
+  })
+
+  app.post('/api/agent/runs/:runId/worktree/cleanup', async (request, response) => {
+    try {
+      const run = await agentController.cleanupRunWorktree(request.params.runId)
+      response.status(202).json({ run })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const status = message.includes('not found') ? 404 : 409

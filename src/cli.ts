@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import open from 'open'
+import { loadAwbSettings } from './config.js'
 import { startServer } from './server.js'
 
 type CliOptions = {
@@ -10,6 +11,7 @@ type CliOptions = {
   port: number
   shouldOpen: boolean
   dev: boolean
+  editorOverride?: string
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -33,6 +35,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.shouldOpen = false
     } else if (arg === '--dev') {
       options.dev = true
+    } else if (arg === '--editor') {
+      options.editorOverride = argv[++index] || options.editorOverride
     } else if (arg === '--help' || arg === '-h') {
       printHelp()
       process.exit(0)
@@ -43,7 +47,7 @@ function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  console.log(`awb\n\nUsage:\n  awb [--dir PATH] [--tickets-dir DIR] [--port PORT] [--no-open] [--dev]\n`)
+  console.log(`awb\n\nUsage:\n  awb [--dir PATH] [--tickets-dir DIR] [--port PORT] [--no-open] [--dev] [--editor COMMAND]\n`)
 }
 
 async function main(): Promise<void> {
@@ -55,7 +59,16 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const { url } = await startServer(options)
+  const settings = await loadAwbSettings({
+    projectDir: options.projectDir,
+    editorOverride: options.editorOverride,
+  })
+
+  const { url } = await startServer({
+    ...options,
+    editorCommand: settings.editorCommand,
+    worktreeIsolationEnabled: settings.worktreeIsolationEnabled,
+  })
 
   console.log(`awb: serving ${absoluteTicketsDir}`)
   console.log(`awb: ${url}`)

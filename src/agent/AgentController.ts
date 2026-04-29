@@ -9,10 +9,12 @@ import type {
   AgentPanelState,
   AgentRunEvent,
   AgentRunState,
+  AgentRunWorktreeState,
   AgentToolActivityEntry,
   SelectedTicketContext,
   TicketRunContext,
 } from './types.js'
+import { openPathInEditor } from '../editor.js'
 
 type SessionFactory = typeof createPiSession
 
@@ -22,6 +24,13 @@ type RunRecord = {
   unsubscribeSession?: () => void
 }
 
+type WorktreeManager = {
+  enabled: boolean
+  reconcileStaleWorktrees: () => Promise<void>
+  provision: (runId: string) => Promise<AgentRunWorktreeState>
+  cleanup: (worktree: AgentRunWorktreeState, options: { removeBranch: boolean }) => Promise<AgentRunWorktreeState>
+}
+
 type AgentControllerOptions = {
   createSession: SessionFactory
   createRunId: () => string
@@ -29,6 +38,8 @@ type AgentControllerOptions = {
   loginController: LoginController
   credentialProvider: CredentialProvider
   modelRegistry: ModelRegistry
+  worktreeManager?: WorktreeManager
+  editorCommand?: string
 }
 
 export class AgentController {
@@ -39,9 +50,12 @@ export class AgentController {
   private readonly loginController: LoginController
   private readonly credentialProvider: CredentialProvider
   private readonly modelRegistry: ModelRegistry
+  private readonly worktreeManager?: WorktreeManager
+  private readonly editorCommand?: string
   private readonly runs = new Map<string, RunRecord>()
   private runOrder: string[] = []
   private selectedTicket?: SelectedTicketContext
+  private hasReconciledStaleWorktrees = false
 
   constructor(
     private readonly projectDir: string,
@@ -53,10 +67,16 @@ export class AgentController {
     this.loginController = options.loginController
     this.credentialProvider = options.credentialProvider
     this.modelRegistry = options.modelRegistry
+    this.worktreeManager = options.worktreeManager
+    this.editorCommand = options.editorCommand
   }
 
   async ensureStarted(): Promise<void> {
     this.modelRegistry.refresh()
+    if (!this.hasReconciledStaleWorktrees) {
+      await this.worktreeManager?.reconcileStaleWorktrees()
+      this.hasReconciledStaleWorktrees = true
+    }
   }
 
   getState(): AgentPanelState {
@@ -153,10 +173,15 @@ export class AgentController {
       },
       queuedSteeringCount: 0,
       queuedFollowUpCount: 0,
-      worktree: {
-        mode: 'shared-project',
-        status: 'not-requested',
-      },
+      worktree: this.worktreeManager?.enabled
+        ? {
+            mode: 'git-worktree',
+            status: 'provisioning',
+          }
+        : {
+            mode: 'shared-project',
+            status: 'not-requested',
+          },
     }
 
     this.runs.set(runId, { run })
@@ -192,6 +217,30 @@ export class AgentController {
     })
     this.emitRunUpdated(record.run)
     await record.session.prompt(userText)
+  }
+
+  async openRunWorktreeInEditor(runId: string): Promise<void> {
+    const record = this.requireRun(runId)
+    const worktreePath = record.run.worktree?.path
+    if (!worktreePath || record.run.worktree?.status !== 'ready') {
+      throw new Error(`Run ${runId} does not have a retained worktree to open.`)
+    }
+    await openPathInEditor(this.editorCommand, worktreePath)
+  }
+
+  async cleanupRunWorktree(runId: string): Promise<AgentRunState> {
+    const record = this.requireRun(runId)
+    if (!record.run.worktree || record.run.worktree.mode !== 'git-worktree') {
+      throw new Error(`Run ${runId} does not use a dedicated worktree.`)
+    }
+    record.run.worktree = {
+      ...record.run.worktree,
+      status: 'cleanup-pending',
+      cleanupStartedAt: this.now(),
+    }
+    this.emitRunUpdated(record.run)
+    await this.cleanupRunWorktreeRecord(record, record.run.status === 'failed')
+    return record.run
   }
 
   async abortRun(runId: string): Promise<void> {
@@ -264,7 +313,15 @@ export class AgentController {
 
     try {
       this.modelRegistry.refresh()
+      if (this.worktreeManager?.enabled) {
+        record.run.worktree = await this.worktreeManager.provision(runId)
+        record.run.updatedAt = this.now()
+        record.run.transcript.updatedAt = record.run.updatedAt
+        this.emitRunUpdated(record.run)
+      }
+      const cwd = record.run.worktree?.mode === 'git-worktree' && record.run.worktree.path ? record.run.worktree.path : this.projectDir
       const { session } = await this.createSession(this.projectDir, {
+        cwd,
         credentialProvider: this.credentialProvider,
         modelRegistry: this.modelRegistry,
       })
@@ -286,6 +343,14 @@ export class AgentController {
       record.run.completedAt = timestamp
       record.run.updatedAt = timestamp
       record.run.lastError = message
+      if (record.run.worktree?.mode === 'git-worktree') {
+        record.run.worktree = {
+          ...record.run.worktree,
+          status: 'failed',
+          cleanupError: message,
+          lastCheckedAt: timestamp,
+        }
+      }
       record.run.transcript.entries.push({
         id: `${runId}:error:${timestamp}`,
         role: 'error',
@@ -296,6 +361,7 @@ export class AgentController {
       record.run.transcript.updatedAt = timestamp
       this.emit({ type: 'error', runId, message })
       this.emitRunUpdated(record.run)
+      await this.cleanupRunWorktreeRecord(record, true)
     }
   }
 
@@ -304,6 +370,17 @@ export class AgentController {
     if (!record) return
     const events = applySessionEvent(record.run, event, this.now)
     for (const e of events) this.emit(e)
+    if (record.run.status === 'failed') {
+      void this.cleanupRunWorktreeRecord(record, true)
+    }
+  }
+
+  private async cleanupRunWorktreeRecord(record: RunRecord, removeBranch: boolean): Promise<void> {
+    if (!this.worktreeManager || !record.run.worktree || record.run.worktree.mode !== 'git-worktree') return
+    if (record.run.worktree.status === 'cleaned' || record.run.worktree.status === 'cleaning') return
+    record.run.worktree = await this.worktreeManager.cleanup(record.run.worktree, { removeBranch })
+    record.run.updatedAt = this.now()
+    this.emitRunUpdated(record.run)
   }
 
   private requireRun(runId: string): RunRecord {

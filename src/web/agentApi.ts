@@ -63,6 +63,16 @@ export async function abortSpecificAgentRun(runId: string): Promise<void> {
   await postJson(`/api/agent/runs/${encodeURIComponent(runId)}/abort`, {})
 }
 
+export async function openAgentRunWorktree(runId: string): Promise<void> {
+  await postJson(`/api/agent/runs/${encodeURIComponent(runId)}/worktree/open`, {})
+}
+
+export async function cleanupAgentRunWorktree(runId: string): Promise<AgentRunState> {
+  const response = await postJson(`/api/agent/runs/${encodeURIComponent(runId)}/worktree/cleanup`, {})
+  const payload = (await response.json()) as { run: AgentRunState }
+  return payload.run
+}
+
 export async function setAgentSelectedTicketContext(ticket: SelectedTicketContext | undefined): Promise<void> {
   await postJson('/api/agent/context', ticket ? ticket : {})
 }

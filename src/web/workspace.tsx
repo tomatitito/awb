@@ -839,12 +839,16 @@ function AgentRunDetail({
   run,
   onSendPrompt,
   onAbortRun,
+  onOpenWorktree,
+  onCleanupWorktree,
   onBack,
   showBack,
 }: {
   run?: AgentRunState
   onSendPrompt: (runId: string, text: string) => Promise<void>
   onAbortRun: (runId: string) => Promise<void>
+  onOpenWorktree: (runId: string) => Promise<void>
+  onCleanupWorktree: (runId: string) => Promise<void>
   onBack?: () => void
   showBack: boolean
 }) {
@@ -858,6 +862,7 @@ function AgentRunDetail({
   const active = isActiveAgentRun(run)
   const transcript = run.transcript.entries
   const toolActivity = [...run.transcript.toolActivity].slice(-12).reverse()
+  const hasRetainedWorktree = run.worktree?.mode === 'git-worktree' && run.worktree.status === 'ready' && Boolean(run.worktree.path)
 
   return (
     <section className="agent-run-detail" data-awb="agent-run-detail">
@@ -894,6 +899,58 @@ function AgentRunDetail({
           <span>{run.queuedSteeringCount + run.queuedFollowUpCount}</span>
         </div>
       </div>
+
+      <section className="agent-panel-section">
+        <strong>Worktree</strong>
+        <div className="agent-panel-section-grid">
+          <div>
+            <strong>Mode</strong>
+            <span>{run.worktree?.mode ?? 'shared-project'}</span>
+          </div>
+          <div>
+            <strong>Status</strong>
+            <span>{run.worktree?.status ?? 'not-requested'}</span>
+          </div>
+          <div>
+            <strong>Branch</strong>
+            <span>{run.worktree?.branch ?? '—'}</span>
+          </div>
+          <div>
+            <strong>Path</strong>
+            <span>{run.worktree?.path ?? '—'}</span>
+          </div>
+        </div>
+        {run.worktree?.cleanupError ? <div className="agent-panel-error">{run.worktree.cleanupError}</div> : null}
+        <div className="agent-run-controls" aria-label="Worktree controls">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!hasRetainedWorktree}
+            onClick={() => {
+              setActionError(undefined)
+              void onOpenWorktree(run.id).catch((error) => {
+                setActionError(error instanceof Error ? error.message : String(error))
+              })
+            }}
+          >
+            Open in editor
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={run.worktree?.mode !== 'git-worktree' || run.worktree.status === 'cleaned' || run.worktree.status === 'cleaning'}
+            onClick={() => {
+              setActionError(undefined)
+              void onCleanupWorktree(run.id).catch((error) => {
+                setActionError(error instanceof Error ? error.message : String(error))
+              })
+            }}
+          >
+            Clean up worktree
+          </button>
+        </div>
+        {actionError ? <div className="agent-panel-error">{actionError}</div> : null}
+      </section>
 
       <section className="agent-panel-section">
         <strong>Transcript</strong>
@@ -981,6 +1038,8 @@ export function AgentsView({
   onBack,
   onSendPrompt,
   onAbortRun,
+  onOpenWorktree,
+  onCleanupWorktree,
   viewportMode,
 }: {
   runs: AgentRunState[]
@@ -989,6 +1048,8 @@ export function AgentsView({
   onBack: () => void
   onSendPrompt: (runId: string, text: string) => Promise<void>
   onAbortRun: (runId: string) => Promise<void>
+  onOpenWorktree: (runId: string) => Promise<void>
+  onCleanupWorktree: (runId: string) => Promise<void>
   viewportMode: ViewportMode
 }) {
   if (runs.length === 0) {
@@ -1025,7 +1086,17 @@ export function AgentsView({
             ))}
           </div>
         ) : null}
-        {!isMobile || showDetailOnly ? <AgentRunDetail run={selectedRun} onSendPrompt={onSendPrompt} onAbortRun={onAbortRun} onBack={onBack} showBack={isMobile} /> : null}
+        {!isMobile || showDetailOnly ? (
+          <AgentRunDetail
+            run={selectedRun}
+            onSendPrompt={onSendPrompt}
+            onAbortRun={onAbortRun}
+            onOpenWorktree={onOpenWorktree}
+            onCleanupWorktree={onCleanupWorktree}
+            onBack={onBack}
+            showBack={isMobile}
+          />
+        ) : null}
       </div>
     </section>
   )

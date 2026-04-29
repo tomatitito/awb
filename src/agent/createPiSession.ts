@@ -20,16 +20,18 @@ export interface CredentialProvider {
 export async function createPiSession(
   projectDir: string,
   options: {
+    cwd?: string
     credentialProvider?: CredentialProvider
     modelRegistry?: ModelRegistry
     model?: Model<any>
   } = {},
 ) {
+  const cwd = options.cwd ?? projectDir
   const authStorage = (options.credentialProvider as AuthStorage) ?? AuthStorage.create()
   const modelRegistry = options.modelRegistry ?? ModelRegistry.create(authStorage)
   const eventBus = createEventBus()
   const resourceLoader = new DefaultResourceLoader({
-    cwd: projectDir,
+    cwd,
     eventBus,
   })
 
@@ -39,12 +41,12 @@ export async function createPiSession(
   await fs.mkdir(awbSessionDir, { recursive: true })
 
   const result = await createAgentSession({
-    cwd: projectDir,
+    cwd,
     authStorage,
     modelRegistry,
     model: options.model,
     resourceLoader,
-    sessionManager: SessionManager.continueRecent(projectDir, awbSessionDir),
+    sessionManager: SessionManager.continueRecent(cwd, awbSessionDir),
   })
 
   return {
