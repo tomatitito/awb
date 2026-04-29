@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { AgentPanelState, AgentRunState } from '../agent/types'
 import type { VisibleGraphDerivation } from '../core/graph'
@@ -329,12 +329,6 @@ function StatusBadge({ ticket }: { ticket: DerivedTicket }) {
   return <span className={`badge status-${normalizeStatus(status).replace(/\s+/g, '-')}`}>{status}</span>
 }
 
-function handleCardKeyDown(event: KeyboardEvent<HTMLElement>, onSelect: () => void) {
-  if (event.key !== 'Enter' && event.key !== ' ') return
-  event.preventDefault()
-  onSelect()
-}
-
 function AgentRunButton({ ticketId, isPending, isActive, onRun }: { ticketId: string; isPending: boolean; isActive: boolean; onRun: (ticketId: string) => Promise<void> }) {
   const isDisabled = isPending || isActive
   const label = isPending ? 'Starting agent run' : isActive ? 'Agent run active' : 'Start agent run'
@@ -473,7 +467,7 @@ export function GraphView({
     if (!containerRef.current || !selectedId || graph.hasCycle) return
     const selectedCard = containerRef.current.querySelector<HTMLElement>(`[data-ticket-id="${selectedId}"]`)
     selectedCard?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [graph.hasCycle, selectedId, direction])
+  }, [graph.hasCycle, selectedId])
 
   const { ticketById, matchingIds, criticalNodeIds, criticalEdgeIds, relatedNodeIds, relatedTargetIds, positionedNodes, positionedNodeById, layerIndexes, width, height } =
     useMemo(() => {
@@ -596,34 +590,32 @@ export function GraphView({
               .join(' ')
 
             return (
-              <div
-                key={ticket.id}
-                role="button"
-                tabIndex={0}
-                className={className}
-                data-awb="graph-ticket-card"
-                data-ticket-id={ticket.id}
-                style={{ left: node.x, top: node.y, width: GRAPH_CARD_WIDTH, height: GRAPH_CARD_HEIGHT }}
-                onClick={() => onSelect(ticket.id)}
-                onKeyDown={(event) => handleCardKeyDown(event, () => onSelect(ticket.id))}
-                title={summarizeTicketBody(ticket.body) || ticket.title}
-              >
-                <div className="graph-ticket-card-top">
-                  <strong>{ticket.id}</strong>
-                  <div className="graph-ticket-card-badges">
-                    {ticket.ready ? (
-                      <>
-                        <span className="badge compact ready">ready</span>
-                        <AgentRunButton ticketId={ticket.id} isPending={pendingRunTicketIds.has(ticket.id)} isActive={activeRunTicketIds.has(ticket.id)} onRun={onStartAgentRun} />
-                      </>
-                    ) : null}
-                    <span className={`badge compact ${statusClass}`}>{status}</span>
+              <div key={ticket.id} className={className} style={{ left: node.x, top: node.y, width: GRAPH_CARD_WIDTH, height: GRAPH_CARD_HEIGHT }}>
+                <button
+                  type="button"
+                  className="graph-ticket-card-button"
+                  data-awb="graph-ticket-card"
+                  data-ticket-id={ticket.id}
+                  onClick={() => onSelect(ticket.id)}
+                  title={summarizeTicketBody(ticket.body) || ticket.title}
+                >
+                  <div className="graph-ticket-card-top">
+                    <strong>{ticket.id}</strong>
+                    <div className="graph-ticket-card-badges">
+                      {ticket.ready ? <span className="badge compact ready">ready</span> : null}
+                      <span className={`badge compact ${statusClass}`}>{status}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="graph-ticket-card-title">{ticket.title}</div>
-                <div className="graph-ticket-card-meta">
-                  <span>{epicLabel || 'No epic'}</span>
-                </div>
+                  <div className="graph-ticket-card-title">{ticket.title}</div>
+                  <div className="graph-ticket-card-meta">
+                    <span>{epicLabel || 'No epic'}</span>
+                  </div>
+                </button>
+                {ticket.ready ? (
+                  <div className="graph-ticket-card-run-action">
+                    <AgentRunButton ticketId={ticket.id} isPending={pendingRunTicketIds.has(ticket.id)} isActive={activeRunTicketIds.has(ticket.id)} onRun={onStartAgentRun} />
+                  </div>
+                ) : null}
               </div>
             )
           })}
@@ -668,8 +660,8 @@ export function GraphPanel({
     <section className="graph-panel">
       <div className="graph-controls">
         <div className="graph-controls-group">
-          <span className="graph-controls-label">Layout</span>
-          <div className="graph-control-segment" role="group" aria-label="Graph layout direction">
+          <fieldset className="graph-control-segment">
+            <legend className="graph-controls-label">Layout</legend>
             <button
               type="button"
               className={directionPreference === undefined ? 'active' : ''}
@@ -694,7 +686,7 @@ export function GraphPanel({
             >
               Top → bottom
             </button>
-          </div>
+          </fieldset>
         </div>
         <div className="graph-controls-group">
           <span className="graph-controls-label">Path</span>
@@ -768,30 +760,23 @@ export function KanbanView({
           </header>
           <div className="kanban-cards">
             {items.map((ticket) => (
-              <div
-                key={ticket.id}
-                role="button"
-                tabIndex={0}
-                className={`kanban-card ${selectedId === ticket.id ? 'selected' : ''}`}
-                onClick={() => onSelect(ticket.id)}
-                onKeyDown={(event) => handleCardKeyDown(event, () => onSelect(ticket.id))}
-              >
-                <div className="kanban-card-header">
-                  <strong title={getTicketHoverText(ticket)}>{ticket.id}</strong>
-                  <div className="kanban-card-header-badges">
-                    {ticket.ready ? (
-                      <>
-                        <span className="badge ready">ready</span>
-                        <AgentRunButton ticketId={ticket.id} isPending={pendingRunTicketIds.has(ticket.id)} isActive={activeRunTicketIds.has(ticket.id)} onRun={onStartAgentRun} />
-                      </>
-                    ) : null}
+              <div key={ticket.id} className={`kanban-card ${selectedId === ticket.id ? 'selected' : ''}`}>
+                <button type="button" className="kanban-card-button" onClick={() => onSelect(ticket.id)}>
+                  <div className="kanban-card-header">
+                    <strong title={getTicketHoverText(ticket)}>{ticket.id}</strong>
+                    <div className="kanban-card-header-badges">{ticket.ready ? <span className="badge ready">ready</span> : null}</div>
                   </div>
-                </div>
-                <div className="kanban-card-title">{ticket.title}</div>
-                <div className="kanban-card-meta">
-                  {ticket.priority !== undefined ? <span>P{ticket.priority}</span> : null}
-                  <span>{ticket.blockedBy.length} deps</span>
-                </div>
+                  <div className="kanban-card-title">{ticket.title}</div>
+                  <div className="kanban-card-meta">
+                    {ticket.priority !== undefined ? <span>P{ticket.priority}</span> : null}
+                    <span>{ticket.blockedBy.length} deps</span>
+                  </div>
+                </button>
+                {ticket.ready ? (
+                  <div className="kanban-card-run-action">
+                    <AgentRunButton ticketId={ticket.id} isPending={pendingRunTicketIds.has(ticket.id)} isActive={activeRunTicketIds.has(ticket.id)} onRun={onStartAgentRun} />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -921,7 +906,7 @@ function AgentRunDetail({
           </div>
         </div>
         {run.worktree?.cleanupError ? <div className="agent-panel-error">{run.worktree.cleanupError}</div> : null}
-        <div className="agent-run-controls" aria-label="Worktree controls">
+        <div className="agent-run-controls">
           <button
             type="button"
             className="secondary-button"
@@ -1002,7 +987,7 @@ function AgentRunDetail({
           <strong>Follow-up prompt</strong>
           <textarea value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Ask the run what to do next" rows={5} />
           {actionError ? <div className="agent-panel-error">{actionError}</div> : null}
-          <div className="agent-run-controls" aria-label="Run controls">
+          <div className="agent-run-controls">
             <button type="submit" className="primary-button" disabled={run.status === 'queued' || run.status === 'starting'}>
               Send
             </button>
@@ -1071,20 +1056,22 @@ export function AgentsView({
       </header>
       <div className={`agents-layout ${isMobile ? 'mobile' : 'desktop'}`}>
         {!showDetailOnly ? (
-          <div className="agents-run-list" role="list" aria-label="Agent runs">
+          <ul className="agents-run-list" aria-label="Agent runs">
             {runs.map((run) => (
-              <button key={run.id} type="button" className={`agents-run-row ${selectedRun?.id === run.id ? 'selected' : ''}`} role="listitem" onClick={() => onSelectRun(run.id)}>
-                <div className="agents-run-row-top">
-                  <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
-                    {formatAgentRunStatus(run.status)}
-                  </span>
-                  <span className="agents-run-started-at">{formatAgentRunStartedAt(run)}</span>
-                </div>
-                <div className="agents-run-ticket-id">{run.ticket.ticketId}</div>
-                <div className="agents-run-ticket-title">{run.ticket.title}</div>
-              </button>
+              <li key={run.id}>
+                <button type="button" className={`agents-run-row ${selectedRun?.id === run.id ? 'selected' : ''}`} onClick={() => onSelectRun(run.id)}>
+                  <div className="agents-run-row-top">
+                    <span className={`badge agent-run-status status-${normalizeStatus(formatAgentRunStatus(run.status)).replace(/\s+/g, '-')}`}>
+                      {formatAgentRunStatus(run.status)}
+                    </span>
+                    <span className="agents-run-started-at">{formatAgentRunStartedAt(run)}</span>
+                  </div>
+                  <div className="agents-run-ticket-id">{run.ticket.ticketId}</div>
+                  <div className="agents-run-ticket-title">{run.ticket.title}</div>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : null}
         {!isMobile || showDetailOnly ? (
           <AgentRunDetail

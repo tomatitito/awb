@@ -1,6 +1,6 @@
 ---
 id: awb-j4x6
-status: open
+status: closed
 deps: []
 links: [tv-nvfy]
 created: 2026-04-29T00:00:00Z
@@ -93,3 +93,9 @@ Expected fix:
 - semantics are improved rather than merely silenced
 - `bun test` passes
 - `bun run check` moves closer to green with this ticket alone
+
+## Notes
+
+**2026-04-29T13:25:00Z**
+
+Used red/green TDD by adding `tests/web/agentLoginSection.test.ts` for duplicate-aware progress message keys, then fixed the remaining React/accessibility diagnostics in the scoped web UI files. Reworked login polling dependencies around `loginFlowStatus`, replaced index-based progress keys with stable occurrence-based keys, removed invalid `aria-label` usage from plain control containers, converted Graph and Kanban selectable cards to semantic buttons without nesting the run-launch button, switched grouped/list semantics to `fieldset`/`legend` and `ul`/`li`, and trimmed the selected-card scroll effect dependencies. Verified with `bunx biome check src/web/AgentLoginSection.tsx src/web/AgentPanel.tsx src/web/workspace.tsx`, `bun test`, `bun run build`, and `bun run check` now only reports the remaining unrelated CSS descending-specificity warnings.

@@ -140,7 +140,7 @@ export function AgentPanel({
       >
         <strong>Prompt</strong>
         <textarea value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Ask the agent what to do next" rows={5} />
-        <div className="agent-run-controls" aria-label="Agent execution controls">
+        <div className="agent-run-controls">
           <button type="submit" data-awb="agent-send" className="primary-button" disabled={state.status === 'connecting' || state.isStreaming}>
             Send
           </button>

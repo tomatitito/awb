@@ -1,10 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { AgentAuthProviderState, AgentLoginFlowState } from '../agent/types'
 import { cancelAgentLogin, fetchAgentAuthProviders, fetchAgentLoginFlow, startAgentLogin, submitAgentLoginInput } from './agentApi'
 
 export function isSafeAuthUrl(url: string): boolean {
   return url.startsWith('https://') || url.startsWith('http://')
+}
+
+export function buildProgressMessageEntries(messages: string[]): { key: string; message: string }[] {
+  const counts = new Map<string, number>()
+  return messages.map((message) => {
+    const count = (counts.get(message) ?? 0) + 1
+    counts.set(message, count)
+    return {
+      key: `${message}:${count}`,
+      message,
+    }
+  })
 }
 
 export function AgentLoginSection({
@@ -49,8 +61,11 @@ export function AgentLoginSection({
     }
   }, [])
 
+  const loginFlowStatus = loginFlow?.status
+  const progressEntries = useMemo(() => buildProgressMessageEntries(loginFlow?.progressMessages ?? []), [loginFlow?.progressMessages])
+
   useEffect(() => {
-    if (!loginFlow || !['authorizing', 'awaiting-input', 'running'].includes(loginFlow.status)) return
+    if (!loginFlowStatus || !['authorizing', 'awaiting-input', 'running'].includes(loginFlowStatus)) return
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     let cancelled = false
@@ -82,7 +97,7 @@ export function AgentLoginSection({
       cancelled = true
       if (timeoutId !== undefined) clearTimeout(timeoutId)
     }
-  }, [loginFlow?.status, onRefreshState])
+  }, [loginFlowStatus, onRefreshState])
 
   return (
     <section className="agent-panel-section">
@@ -129,11 +144,11 @@ export function AgentLoginSection({
             </a>
           ) : null}
           {loginFlow.instructions ? <div className="agent-composer-note">{loginFlow.instructions}</div> : null}
-          {loginFlow.progressMessages.length > 0 ? (
+          {progressEntries.length > 0 ? (
             <div className="agent-tool-list">
-              {loginFlow.progressMessages.map((message, index) => (
-                <div key={`${message}-${index}`} className="agent-tool-item">
-                  <code>{message}</code>
+              {progressEntries.map((entry) => (
+                <div key={entry.key} className="agent-tool-item">
+                  <code>{entry.message}</code>
                 </div>
               ))}
             </div>

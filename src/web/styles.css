@@ -577,9 +577,17 @@ select:focus-visible,
   letter-spacing: 0.08em;
 }
 
+legend.graph-controls-label {
+  margin-right: 0;
+  margin-bottom: 6px;
+  padding: 0;
+}
+
 .graph-control-segment {
   display: inline-flex;
   gap: 0;
+  margin: 0;
+  padding: 0;
   border: 1px solid var(--dim);
   border-radius: 6px;
   overflow: hidden;
@@ -757,17 +765,11 @@ select:focus-visible,
 
 .graph-ticket-card {
   position: absolute;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  padding: 10px 12px;
-  text-align: left;
   background: var(--container-bg);
   color: var(--text);
   border: 1px solid var(--dim);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  cursor: pointer;
   transition:
     border-color 120ms ease,
     transform 120ms ease,
@@ -775,8 +777,30 @@ select:focus-visible,
     opacity 120ms ease;
 }
 
+.graph-ticket-card-button {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.graph-ticket-card-run-action {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
 .graph-ticket-card:hover,
-.graph-ticket-card:focus-visible {
+.graph-ticket-card:focus-within {
   transform: translateY(-1px);
   border-color: var(--border);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
@@ -1397,6 +1421,9 @@ select:focus-visible,
 .agents-run-list {
   display: grid;
   gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .agents-run-row {
@@ -1556,17 +1583,32 @@ select:focus-visible,
 }
 
 .kanban-card {
+  position: relative;
   text-align: left;
   background: var(--body-bg);
   color: var(--text);
   border: 1px solid var(--dim);
   border-radius: 4px;
+}
+
+.kanban-card-button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: 0;
   padding: 10px;
   cursor: pointer;
 }
 
+.kanban-card-run-action {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
 .kanban-card:hover,
-.kanban-card:focus-visible {
+.kanban-card:focus-within {
   background: var(--selected-bg);
 }
 
