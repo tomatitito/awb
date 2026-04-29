@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  closeMobileAgentOverlay,
-  openAgentPanelFromHeader,
-  openMobileDetailsForTicket,
-  type MobileWorkspaceState,
-} from '../../src/web/mobileFlow'
+import { closeMobileAgentOverlay, type MobileWorkspaceState, openAgentPanelFromHeader, openMobileDetailsForTicket } from '../../src/web/mobileFlow'
 
 describe('mobile workspace flow helpers', () => {
   test('opens details when a graph ticket is selected on mobile', () => {
@@ -39,10 +34,12 @@ describe('mobile workspace flow helpers', () => {
   })
 
   test('closing the agent overlay returns to the previously active view', () => {
-    expect(closeMobileAgentOverlay({
-      isAgentPanelOpen: true,
-      lastActiveWorkspaceTab: 'details',
-    })).toEqual({
+    expect(
+      closeMobileAgentOverlay({
+        isAgentPanelOpen: true,
+        lastActiveWorkspaceTab: 'details',
+      }),
+    ).toEqual({
       tab: 'details',
       isAgentPanelOpen: false,
     })

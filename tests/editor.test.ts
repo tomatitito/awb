@@ -17,14 +17,12 @@ describe('openPathInEditor', () => {
     const outputPath = path.join(root, 'editor-target.txt')
     const targetPath = path.join(root, 'worktree with spaces')
 
-    await openPathInEditor(`printf %s \"$1\" > ${JSON.stringify(outputPath)}`, targetPath)
+    await openPathInEditor(`printf %s "$1" > ${JSON.stringify(outputPath)}`, targetPath)
 
     await expect(fs.readFile(outputPath, 'utf8')).resolves.toBe(targetPath)
   })
 
   test('throws a clear error when no editor is configured', async () => {
-    await expect(openPathInEditor(undefined, '/tmp/worktree')).rejects.toThrow(
-      'No AWB editor is configured. Set it in .awb/config.json, AWB_EDITOR, or --editor.',
-    )
+    await expect(openPathInEditor(undefined, '/tmp/worktree')).rejects.toThrow('No AWB editor is configured. Set it in .awb/config.json, AWB_EDITOR, or --editor.')
   })
 })

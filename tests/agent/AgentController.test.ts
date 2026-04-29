@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { AgentSession, AgentSessionEvent, AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import { AgentController } from '../../src/agent/AgentController'
 import { LoginController } from '../../src/agent/LoginController'
-import type { TicketRunContext, AgentRunWorktreeState } from '../../src/agent/types'
+import type { AgentRunWorktreeState, TicketRunContext } from '../../src/agent/types'
 
 const stubAuthStorage = {
   get: () => undefined,
@@ -247,12 +247,14 @@ describe('AgentController', () => {
 
     expect(worktreeManager.calls).toEqual(['provision:run-1'])
     expect(calls).toEqual(['session:/project/.awb/worktrees/run-1'])
-    expect(controller.getRun('run-1')?.worktree).toEqual(expect.objectContaining({
-      mode: 'git-worktree',
-      status: 'ready',
-      path: '/project/.awb/worktrees/run-1',
-      branch: 'awb/run/run-1',
-    }))
+    expect(controller.getRun('run-1')?.worktree).toEqual(
+      expect.objectContaining({
+        mode: 'git-worktree',
+        status: 'ready',
+        path: '/project/.awb/worktrees/run-1',
+        branch: 'awb/run/run-1',
+      }),
+    )
   })
 
   test('retains successful worktrees and cleans up failed ones', async () => {

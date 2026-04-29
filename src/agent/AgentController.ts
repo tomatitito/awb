@@ -1,5 +1,6 @@
 import type { AssistantMessage } from '@mariozechner/pi-ai'
 import type { AgentSession, AgentSessionEvent, ModelRegistry } from '@mariozechner/pi-coding-agent'
+import { openPathInEditor } from '../editor.js'
 import type { CredentialProvider, createPiSession } from './createPiSession.js'
 import type { LoginController } from './LoginController.js'
 import type {
@@ -14,7 +15,6 @@ import type {
   SelectedTicketContext,
   TicketRunContext,
 } from './types.js'
-import { openPathInEditor } from '../editor.js'
 
 type SessionFactory = typeof createPiSession
 

@@ -7,8 +7,8 @@ import {
   getVisibleKanbanTickets,
   getVisibleTickets,
   normalizeFilterValue,
-  UNGROUPED_EPIC_FILTER,
   type SidebarFilters,
+  UNGROUPED_EPIC_FILTER,
 } from '../../src/web/filtering'
 
 function ticket(overrides: Partial<DerivedTicket> & { id: string }): DerivedTicket {
@@ -52,34 +52,19 @@ describe('sidebar filtering', () => {
   })
 
   test('extracts epics and sorts them by id', () => {
-    const tickets = [
-      ticket({ id: 'story-1', type: 'story' }),
-      ticket({ id: 'epic-b', type: 'EPIC' }),
-      ticket({ id: 'epic-a', type: 'epic' }),
-      ticket({ id: 'task-1' }),
-    ]
+    const tickets = [ticket({ id: 'story-1', type: 'story' }), ticket({ id: 'epic-b', type: 'EPIC' }), ticket({ id: 'epic-a', type: 'epic' }), ticket({ id: 'task-1' })]
 
     expect(getEpicTickets(tickets).map((item) => item.id)).toEqual(['epic-a', 'epic-b'])
   })
 
   test('returns unique available statuses and uses unknown for missing status', () => {
-    const tickets = [
-      ticket({ id: 'a', status: 'open' }),
-      ticket({ id: 'b', status: 'closed' }),
-      ticket({ id: 'c', status: 'open' }),
-      ticket({ id: 'd' }),
-    ]
+    const tickets = [ticket({ id: 'a', status: 'open' }), ticket({ id: 'b', status: 'closed' }), ticket({ id: 'c', status: 'open' }), ticket({ id: 'd' })]
 
     expect(getAvailableStatuses(tickets)).toEqual(['open', 'closed', 'unknown'])
   })
 
   test('filters visible tickets by selected statuses', () => {
-    const tickets = [
-      ticket({ id: 'a', status: 'open' }),
-      ticket({ id: 'b', status: 'In Progress' }),
-      ticket({ id: 'c', status: 'closed' }),
-      ticket({ id: 'd' }),
-    ]
+    const tickets = [ticket({ id: 'a', status: 'open' }), ticket({ id: 'b', status: 'In Progress' }), ticket({ id: 'c', status: 'closed' }), ticket({ id: 'd' })]
     const filters: SidebarFilters = {
       ...createDefaultSidebarFilters(),
       statuses: ['OPEN', 'in progress'],
@@ -118,11 +103,7 @@ describe('sidebar filtering', () => {
       epicId: 'epic-a',
     }
 
-    expect(getVisibleKanbanTickets(tickets, undefined, filters).map((item) => item.id)).toEqual([
-      'epic-a',
-      'child-a',
-      'backlog-a',
-    ])
+    expect(getVisibleKanbanTickets(tickets, undefined, filters).map((item) => item.id)).toEqual(['epic-a', 'child-a', 'backlog-a'])
   })
 
   test('filters visible tickets to ungrouped tickets when requested', () => {

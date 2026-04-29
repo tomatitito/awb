@@ -56,11 +56,7 @@ describe('deriveGraph', () => {
   })
 
   test('reports cycles instead of deriving a partial layout', () => {
-    const graph = deriveGraph([
-      ticket({ id: 'task-c', blockedBy: ['task-b'] }),
-      ticket({ id: 'task-a', blockedBy: ['task-c'] }),
-      ticket({ id: 'task-b', blockedBy: ['task-a'] }),
-    ])
+    const graph = deriveGraph([ticket({ id: 'task-c', blockedBy: ['task-b'] }), ticket({ id: 'task-a', blockedBy: ['task-c'] }), ticket({ id: 'task-b', blockedBy: ['task-a'] })])
 
     expect(graph).toEqual({
       hasCycle: true,
@@ -96,9 +92,7 @@ describe('deriveVisibleGraph', () => {
       { id: 'task-b', layer: 1, order: 0, critical: true },
       { id: 'task-c', layer: 2, order: 0, critical: true },
     ])
-    expect(visible.dependencyEdges).toEqual([
-      { id: 'task-b->task-c', source: 'task-b', target: 'task-c', isCritical: true },
-    ])
+    expect(visible.dependencyEdges).toEqual([{ id: 'task-b->task-c', source: 'task-b', target: 'task-c', isCritical: true }])
     expect(visible.criticalPath).toEqual({
       nodeIds: ['task-b', 'task-c'],
       edgeIds: ['task-b->task-c'],
@@ -113,13 +107,7 @@ describe('deriveVisibleGraph', () => {
       unblocks: ['task-c'],
       links: ['task-c', 'task-e', 'task-a', 'task-b', 'task-d'],
     })
-    const tickets = [
-      ticket({ id: 'task-a' }),
-      selected,
-      ticket({ id: 'task-c', blockedBy: ['task-b'] }),
-      ticket({ id: 'task-d' }),
-      ticket({ id: 'task-e' }),
-    ]
+    const tickets = [ticket({ id: 'task-a' }), selected, ticket({ id: 'task-c', blockedBy: ['task-b'] }), ticket({ id: 'task-d' }), ticket({ id: 'task-e' })]
     const graph = deriveGraph(tickets)
 
     const visible = deriveVisibleGraph(graph, tickets, selected)
@@ -150,9 +138,7 @@ describe('deriveVisibleGraph', () => {
       { id: 'epic-a', layer: 0, order: 0, critical: true },
       { id: 'child-a', layer: 1, order: 0, critical: true },
     ])
-    expect(visible.dependencyEdges).toEqual([
-      { id: 'epic-a->child-a', source: 'epic-a', target: 'child-a', isCritical: true },
-    ])
+    expect(visible.dependencyEdges).toEqual([{ id: 'epic-a->child-a', source: 'epic-a', target: 'child-a', isCritical: true }])
   })
 
   test('compacts visible node order within each layer after filtering', () => {
@@ -185,10 +171,7 @@ describe('deriveVisibleGraph', () => {
   })
 
   test('preserves cycle state for visible graph derivation', () => {
-    const graph = deriveGraph([
-      ticket({ id: 'task-a', blockedBy: ['task-b'] }),
-      ticket({ id: 'task-b', blockedBy: ['task-a'] }),
-    ])
+    const graph = deriveGraph([ticket({ id: 'task-a', blockedBy: ['task-b'] }), ticket({ id: 'task-b', blockedBy: ['task-a'] })])
 
     const visible = deriveVisibleGraph(graph, [ticket({ id: 'task-a' })])
 
