@@ -5,6 +5,7 @@ See also:
 - [AWB pi SDK agent panel design](./pi-sdk-agent-panel-design.md)
 - [AWB agent panel architecture](./agent-panel-architecture.md)
 - [Deferred design: per-run git worktree isolation](./agent-run-worktree-isolation.md)
+- [AWB self-update design](./awb-self-update-design.md)
 
 A pattern for building personal knowledge bases using LLMs.
 

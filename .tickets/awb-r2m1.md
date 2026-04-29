@@ -1,6 +1,6 @@
 ---
 id: awb-r2m1
-status: open
+status: closed
 deps: []
 links: [awb-f8c4, awb-v3k9]
 created: 2026-04-29T00:00:00Z
@@ -37,3 +37,9 @@ Implement phase 1 of the update story: detect whether a newer AWB version exists
 - Ignore prereleases during normal checks unless a future update channel feature is added.
 - Keep failures silent unless the user explicitly requested a check.
 - This ticket should not perform in-place installation of updates.
+
+## Notes
+
+**2026-04-29T13:55:00Z**
+
+Used red/green TDD by adding `tests/update.test.ts` for semver comparison plus cache read/write and cache-bypass behavior. Implemented update detection in `src/update.ts` with GitHub Releases as the source, user-level cache storage, silent failure behavior for normal startup checks, and a manual `awb check-for-updates` command that forces a refresh. Added `src/version.ts` so the runtime version is read from `package.json`, and wired a non-blocking startup notice into `src/cli.ts`. Updated `README.md` to mention the manual update-check command. Verified with `bun test`, `bun run build`, and `bun run check --max-diagnostics=20`.

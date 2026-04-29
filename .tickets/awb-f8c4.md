@@ -1,6 +1,6 @@
 ---
 id: awb-f8c4
-status: open
+status: closed
 deps: []
 links: [awb-r2m1, awb-v3k9]
 created: 2026-04-29T00:00:00Z
@@ -35,3 +35,9 @@ Before implementing true self-update, define which installation methods AWB can 
 - This ticket should also define how GitHub Releases are created from version bumps in `package.json`.
 - This ticket is primarily design/documentation unless a small amount of supporting code is needed.
 - The main goal is to avoid implementing a fragile self-update path for Bun/npm/global installs without a clear support policy.
+
+## Notes
+
+**2026-04-29T13:40:00Z**
+
+Updated `wiki/awb-self-update-design.md` to define the support boundary explicitly: in-place self-update is supported only for managed standalone GitHub Release artifact installs, while Bun/npm/global/dev/package-manager installs are detect-only plus manual upgrade guidance. Documented `package.json` as the release version source of truth, the CI release trigger on pushed version bumps, preferred archive-based distribution, artifact naming, checksum/integrity expectations, platform expectations for macOS/Linux/Windows, and atomic replacement/failure-recovery requirements. Linked the design page from `wiki/wiki.md`. Verified repo checks still pass with `bun run check --max-diagnostics=20` and `bun test`.

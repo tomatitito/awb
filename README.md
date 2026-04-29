@@ -49,6 +49,7 @@ awb --port 4312
 awb --no-open
 awb --dev
 awb --editor "code -n"
+awb check-for-updates
 ```
 
 ## Current UI
