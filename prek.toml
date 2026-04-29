@@ -5,6 +5,6 @@
 [[repos]]
 repo = "local"
 hooks = [
-  { id = "biome-check", name = "biome check", entry = "bun run check", language = "system", pass_filenames = false, always_run = true },
+  { id = "biome-check", name = "biome check", entry = "bun scripts/pre-commit-biome.mjs", language = "system", pass_filenames = true },
   { id = "bun-test", name = "bun test", entry = "bun test", language = "system", pass_filenames = false, always_run = true }
 ]
