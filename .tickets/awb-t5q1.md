@@ -1,6 +1,6 @@
 ---
 id: awb-t5q1
-status: open
+status: closed
 deps: []
 links: [tv-nvfy]
 created: 2026-04-29T00:00:00Z
@@ -32,3 +32,9 @@ Resolve the remaining Biome CSS diagnostics caused by mobile-specific selectors 
 - `src/web/styles.css` no longer produces descending-specificity diagnostics
 - mobile and desktop Details layouts remain visually unchanged or intentionally improved
 - `bun run check` moves closer to green with this ticket alone
+
+## Notes
+
+**2026-04-29T13:30:00Z**
+
+Reordered the Details base selectors so `.details-view`, `.details-header`, and `.meta-grid` are defined before their `.viewport-mobile` overrides. This preserves the existing mobile layout behavior while eliminating the remaining descending-specificity diagnostics in `src/web/styles.css`. Verified with `bunx biome check src/web/styles.css` and `bun run check --max-diagnostics=50`.

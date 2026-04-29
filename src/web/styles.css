@@ -1162,18 +1162,6 @@ legend.graph-controls-label {
   padding-bottom: 16px;
 }
 
-.viewport-mobile .details-view {
-  padding: 12px;
-}
-
-.viewport-mobile .details-header {
-  flex-direction: column;
-}
-
-.viewport-mobile .meta-grid {
-  grid-template-columns: 1fr;
-}
-
 .details-view {
   padding: var(--line-height);
 }
@@ -1203,6 +1191,18 @@ legend.graph-controls-label {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 8px;
+}
+
+.viewport-mobile .details-view {
+  padding: 12px;
+}
+
+.viewport-mobile .details-header {
+  flex-direction: column;
+}
+
+.viewport-mobile .meta-grid {
+  grid-template-columns: 1fr;
 }
 
 .meta-grid > div {
