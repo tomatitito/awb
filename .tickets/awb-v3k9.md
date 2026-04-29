@@ -1,6 +1,6 @@
 ---
 id: awb-v3k9
-status: open
+status: closed
 deps: [awb-f8c4, awb-r2m1]
 links: [awb-r2m1, awb-f8c4]
 created: 2026-04-29T00:00:00Z
@@ -33,3 +33,9 @@ Implement the explicit self-update flow for AWB after the supported install/upda
 
 - This ticket depends on both update detection and the release/distribution design.
 - If needed, platform-specific implementation details can be split further later.
+
+## Notes
+
+**2026-04-29T14:05:00Z**
+
+Used red/green TDD with `tests/selfUpdate.test.ts` to cover install-method detection, release artifact selection, checksum parsing, safe executable replacement, and managed-install update flow. Added `src/selfUpdate.ts` with explicit `awb self-update` logic for supported managed GitHub Release installs, including checksum verification, archive extraction, and recoverable replacement. Unsupported installs now print targeted manual upgrade instructions instead of attempting mutation. Wired the new command through `src/cli.ts`, documented it in `README.md`, and updated `wiki/awb-self-update-design.md` to note the adjacent `awb-install.json` metadata expected for managed installs. Verified with `bun test`, `bun run build`, and `bun run check --max-diagnostics=20`.

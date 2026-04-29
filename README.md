@@ -50,6 +50,7 @@ awb --no-open
 awb --dev
 awb --editor "code -n"
 awb check-for-updates
+awb self-update
 ```
 
 ## Current UI

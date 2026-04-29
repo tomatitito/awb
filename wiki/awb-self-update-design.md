@@ -57,6 +57,7 @@ Supported channel definition:
 - the user installed AWB from an official GitHub Release artifact published by AWB
 - the installation is a standalone executable or standalone archive extracted to a user-controlled location
 - the installed binary can determine that it came from this managed channel
+- the extracted install includes adjacent install metadata such as `awb-install.json` so AWB can recognize the managed GitHub Release channel later
 - AWB has permission to replace the installed executable in place
 
 This is the only supported in-place self-update channel in the initial policy.

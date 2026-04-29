@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import open from 'open'
 import { loadAwbSettings } from './config.js'
+import { selfUpdateAwb } from './selfUpdate.js'
 import { startServer } from './server.js'
 import { checkForAwbUpdates, formatUpdateNotice } from './update.js'
 import { getAwbVersion } from './version.js'
@@ -14,7 +15,7 @@ type CliOptions = {
   shouldOpen: boolean
   dev: boolean
   editorOverride?: string
-  command?: 'serve' | 'check-for-updates'
+  command?: 'serve' | 'check-for-updates' | 'self-update'
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -31,6 +32,8 @@ function parseArgs(argv: string[]): CliOptions {
     const arg = argv[index]
     if (arg === 'check-for-updates') {
       options.command = 'check-for-updates'
+    } else if (arg === 'self-update') {
+      options.command = 'self-update'
     } else if (arg === '--dir') {
       options.projectDir = path.resolve(argv[++index] || options.projectDir)
     } else if (arg === '--tickets-dir') {
@@ -53,7 +56,7 @@ function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  console.log(`awb\n\nUsage:\n  awb [--dir PATH] [--tickets-dir DIR] [--port PORT] [--no-open] [--dev] [--editor COMMAND]\n  awb check-for-updates\n`)
+  console.log(`awb\n\nUsage:\n  awb [--dir PATH] [--tickets-dir DIR] [--port PORT] [--no-open] [--dev] [--editor COMMAND]\n  awb check-for-updates\n  awb self-update\n`)
 }
 
 async function main(): Promise<void> {
@@ -77,6 +80,23 @@ async function main(): Promise<void> {
     } else {
       console.log(`awb: you are up to date (${currentVersion})`)
     }
+    return
+  }
+
+  if (options.command === 'self-update') {
+    const result = await selfUpdateAwb({
+      currentVersion,
+      executablePath: process.execPath,
+      invocationPath: process.argv[1] ? path.resolve(process.argv[1]) : undefined,
+      env: process.env,
+    })
+
+    if (result.status === 'unsupported') {
+      console.error(`awb: ${result.message}`)
+      process.exit(1)
+    }
+
+    console.log(`awb: ${result.message}`)
     return
   }
 
