@@ -142,7 +142,8 @@ function deriveLayers(nodes: string[], incoming: Map<string, string[]>, outgoing
   const order: string[] = []
 
   while (ready.length > 0) {
-    const nodeId = ready.shift()!
+    const nodeId = ready.shift()
+    if (nodeId === undefined) break
     order.push(nodeId)
 
     for (const nextId of outgoing.get(nodeId) ?? []) {
@@ -182,7 +183,8 @@ function hasAlternatePath(source: string, target: string, outgoing: Map<string, 
   const visited = new Set<string>([source])
 
   while (queue.length > 0) {
-    const nodeId = queue.shift()!
+    const nodeId = queue.shift()
+    if (nodeId === undefined) break
     if (nodeId === target) return true
     if (visited.has(nodeId)) continue
     visited.add(nodeId)
@@ -231,7 +233,8 @@ function deriveCriticalPath(nodes: string[], incoming: Map<string, string[]>, ou
 
   const topo: string[] = []
   while (ready.length > 0) {
-    const nodeId = ready.shift()!
+    const nodeId = ready.shift()
+    if (nodeId === undefined) break
     topo.push(nodeId)
     for (const nextId of outgoing.get(nodeId) ?? []) {
       const candidateDistance = (distances.get(nodeId) ?? 0) + 1

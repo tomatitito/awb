@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { Model } from '@mariozechner/pi-ai'
+import type { Api, Model } from '@mariozechner/pi-ai'
 import type { AuthCredential } from '@mariozechner/pi-coding-agent'
 import { AuthStorage, createAgentSession, createEventBus, DefaultResourceLoader, ModelRegistry, SessionManager } from '@mariozechner/pi-coding-agent'
 
@@ -23,7 +23,7 @@ export async function createPiSession(
     cwd?: string
     credentialProvider?: CredentialProvider
     modelRegistry?: ModelRegistry
-    model?: Model<any>
+    model?: Model<Api>
   } = {},
 ) {
   const cwd = options.cwd ?? projectDir

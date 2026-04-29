@@ -292,7 +292,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   app.post('/api/agent/context', (request, response) => {
     const ticket = request.body as SelectedTicketContext | undefined
-    if (!ticket || !ticket.ticketId || !ticket.title || !ticket.filePath) {
+    if (!ticket?.ticketId || !ticket.title || !ticket.filePath) {
       agentController.setSelectedTicket(undefined)
       response.status(204).end()
       return

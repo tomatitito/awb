@@ -1,23 +1,29 @@
 import { describe, expect, test } from 'bun:test'
 import type { OAuthLoginCallbacks } from '@mariozechner/pi-ai'
+import type { AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import { LoginController } from '../../src/agent/LoginController'
 
-function makeAuthStorage(overrides: Record<string, unknown> = {}) {
-  return {
+type AuthStorageMock = Pick<AuthStorage, 'get' | 'getOAuthProviders' | 'login'>
+type ModelRegistryMock = Pick<ModelRegistry, 'refresh' | 'getAll' | 'hasConfiguredAuth'>
+
+function makeAuthStorage(overrides: Partial<AuthStorageMock> = {}): AuthStorage {
+  const authStorage: AuthStorageMock = {
     get: () => undefined,
     getOAuthProviders: () => [],
     login: async () => {},
     ...overrides,
-  } as any
+  }
+  return authStorage as AuthStorage
 }
 
-function makeModelRegistry(overrides: Record<string, unknown> = {}) {
-  return {
+function makeModelRegistry(overrides: Partial<ModelRegistryMock> = {}): ModelRegistry {
+  const modelRegistry: ModelRegistryMock = {
     refresh: () => {},
     getAll: () => [],
     hasConfiguredAuth: () => false,
     ...overrides,
-  } as any
+  }
+  return modelRegistry as ModelRegistry
 }
 
 function makeClock(start = 1000) {
@@ -73,7 +79,9 @@ describe('LoginController', () => {
       login: async () => {},
     })
     const modelRegistry = makeModelRegistry({
-      refresh: () => { refreshCount++ },
+      refresh: () => {
+        refreshCount++
+      },
     })
 
     const controller = new LoginController({ authStorage, modelRegistry, now: makeClock() })
@@ -93,10 +101,13 @@ describe('LoginController', () => {
   })
 
   test('rejects startLogin when a flow is already in progress', async () => {
-    let loginResolve: () => void
+    let loginResolve: (() => void) | undefined
     const authStorage = makeAuthStorage({
       getOAuthProviders: () => [{ id: 'test', name: 'Test' }],
-      login: () => new Promise<void>((resolve) => { loginResolve = resolve }),
+      login: () =>
+        new Promise<void>((resolve) => {
+          loginResolve = resolve
+        }),
     })
 
     const controller = new LoginController({
@@ -108,7 +119,10 @@ describe('LoginController', () => {
     await controller.startLogin('test')
     await expect(controller.startLogin('test')).rejects.toThrow('already in progress')
 
-    loginResolve!()
+    if (!loginResolve) {
+      throw new Error('Expected loginResolve to be assigned.')
+    }
+    loginResolve()
   })
 
   test('rejects startLogin for an unknown provider', async () => {
@@ -166,12 +180,10 @@ describe('LoginController', () => {
   })
 
   test('cancels an active login flow', async () => {
-    let loginResolve: () => void
     const authStorage = makeAuthStorage({
       getOAuthProviders: () => [{ id: 'test', name: 'Test' }],
       login: (_id: string, callbacks: OAuthLoginCallbacks) =>
-        new Promise<void>((resolve, reject) => {
-          loginResolve = resolve
+        new Promise<void>((_resolve, reject) => {
           callbacks.signal?.addEventListener('abort', () => reject(new Error('aborted')))
         }),
     })
@@ -224,7 +236,9 @@ describe('LoginController', () => {
   test('sets failed status when login throws', async () => {
     const authStorage = makeAuthStorage({
       getOAuthProviders: () => [{ id: 'test', name: 'Test' }],
-      login: async () => { throw new Error('network error') },
+      login: async () => {
+        throw new Error('network error')
+      },
     })
 
     const controller = new LoginController({
