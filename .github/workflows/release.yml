@@ -1,0 +1,190 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      should_release: ${{ steps.release.outputs.should_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether to release
+        id: release
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          node <<'EOF' >> "$GITHUB_OUTPUT"
+          const fs = require('node:fs')
+          const { execSync } = require('node:child_process')
+
+          function readJson(command) {
+            return JSON.parse(execSync(command, { encoding: 'utf8' }))
+          }
+
+          function compareSemver(left, right) {
+            const normalize = (value) => value.trim().replace(/^v/, '').split('-')[0].split('.').map((part) => Number.parseInt(part, 10) || 0)
+            const leftParts = normalize(left)
+            const rightParts = normalize(right)
+            for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+              const diff = (leftParts[index] ?? 0) - (rightParts[index] ?? 0)
+              if (diff !== 0) return diff
+            }
+            return 0
+          }
+
+          const currentVersion = JSON.parse(fs.readFileSync('package.json', 'utf8')).version
+          const before = process.env.GITHUB_EVENT_BEFORE
+          let previousVersion = ''
+
+          if (before && before !== '0000000000000000000000000000000000000000') {
+            try {
+              previousVersion = readJson(`git show ${before}:package.json`).version
+            } catch {
+              previousVersion = ''
+            }
+          }
+
+          let tagExists = false
+          try {
+            execSync(`git rev-parse -q --verify refs/tags/v${currentVersion}`, { stdio: 'ignore' })
+            tagExists = true
+          } catch {
+            tagExists = false
+          }
+
+          const versionChanged = previousVersion !== currentVersion
+          const versionIncreased = previousVersion ? compareSemver(currentVersion, previousVersion) > 0 : true
+          const shouldRelease = versionChanged && versionIncreased && !tagExists
+
+          console.log(`version=${currentVersion}`)
+          console.log(`tag=v${currentVersion}`)
+          console.log(`should_release=${shouldRelease}`)
+          EOF
+
+  build:
+    needs: metadata
+    if: needs.metadata.outputs.should_release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux
+            arch: x64
+            target: bun-linux-x64
+            archive: tar.gz
+          - runner: macos-13
+            platform: darwin
+            arch: x64
+            target: bun-darwin-x64
+            archive: tar.gz
+          - runner: macos-14
+            platform: darwin
+            arch: arm64
+            target: bun-darwin-arm64
+            archive: tar.gz
+          - runner: windows-latest
+            platform: windows
+            arch: x64
+            target: bun-windows-x64
+            archive: zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.18
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build release artifact
+        run: bun scripts/build-release-artifact.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }} --target=${{ matrix.target }} --archive=${{ matrix.archive }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: awb-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - metadata
+      - build
+    if: needs.metadata.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create checksums
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          cd release-assets
+          sha256sum awb-v${VERSION}-* > awb-v${VERSION}-checksums.txt
+
+      - name: Write release notes
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          cat <<EOF > release-notes.md
+          # AWB v${VERSION}
+
+          This release adds an explicit `awb self-update` command for supported standalone installs.
+
+          ## Highlights
+
+          - Added `awb self-update`
+          - AWB never updates itself automatically without explicit user action
+          - Self-update is supported for managed GitHub Release installs
+          - Downloaded release artifacts are checksum-verified before replacement
+          - Executable replacement uses a safe, recoverable swap
+          - Unsupported install methods now return clear manual upgrade instructions
+
+          ## Unsupported install methods
+
+          For Bun, npm, source checkouts, and unknown or package-manager-managed installs, AWB will not attempt to overwrite the installation and will instead print manual upgrade guidance.
+
+          Examples:
+
+          - `bun install -g awb@latest`
+          - `npm install -g awb@latest`
+
+          ## Verification and safety
+
+          - release archives are selected by platform and architecture
+          - SHA-256 checksum verification is required before install
+          - failed replacement attempts leave the existing executable usable
+          EOF
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.metadata.outputs.tag }}
+          name: AWB ${{ needs.metadata.outputs.tag }}
+          body_path: release-notes.md
+          files: release-assets/*
