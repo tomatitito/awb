@@ -1,17 +1,37 @@
 # awb
 
-Agentic workbench built from the `tk-viewer` codebase.
-
-This repository currently reuses the ticket browsing UI and local server from `tk-viewer` as the foundation for `awb`.
-The current app already provides:
+Agentic workbench built around a lightweight ticket system. The app currently provides:
 
 - a local CLI executable: `awb`
 - parsing of `tk`-style `.tickets/*.md`
 - browser views for Graph, Kanban, and Details
 - a toggleable pi-powered agent panel
+- runnable tickets
 - live reload when ticket files change
 
 The intended next step for `awb` is to add an agent panel and execution flow so the workbench can not only view tickets, but also implement and work on them.
+
+## Install
+
+Install the latest release into `~/.local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomatitito/awb/main/install.sh | sh
+```
+
+The installer detects macOS/Linux and x64/ARM64, downloads the matching latest GitHub release asset, verifies its checksum when available, and copies `awb` into `~/.local/bin`.
+
+To install somewhere else:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomatitito/awb/main/install.sh | INSTALL_DIR=/usr/local/bin sh
+```
+
+Make sure the install directory is on your `PATH`, then run:
+
+```bash
+awb
+```
 
 ## Development
 
@@ -63,6 +83,27 @@ awb self-update
 ## Configuration
 
 AWB reads optional project config from `<project>/.awb/config.json`.
+
+AWB also supports a user-level project discovery allowlist for future project selection.
+
+User config file locations:
+
+- macOS: `~/Library/Application Support/awb/config.json`
+- Linux: `$XDG_CONFIG_HOME/awb/config.json` or `~/.config/awb/config.json`
+- Windows: `%APPDATA%/awb/config.json`
+
+Example user config:
+
+```json
+{
+  "projects": [
+    { "root": "/path/to/project-a", "label": "Project A" },
+    { "root": "/path/to/project-b" }
+  ]
+}
+```
+
+See [`wiki/project-discovery-design.md`](./wiki/project-discovery-design.md) for the project discovery policy and validation rules.
 
 Example:
 
