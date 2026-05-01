@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 const stagedPaths = process.argv.slice(2)
 const supportedExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.jsonc'])
 
-const shouldCheck = (filePath) => {
+const shouldCheck = (filePath: string) => {
   if (!filePath.startsWith('src/') && !filePath.startsWith('tests/')) return false
   const extensionIndex = filePath.lastIndexOf('.')
   if (extensionIndex === -1) return false

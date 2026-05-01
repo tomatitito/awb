@@ -4,12 +4,16 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-function parseArgs(argv) {
-  const options = {
-    platform: undefined,
-    arch: undefined,
-    target: undefined,
-    archive: undefined,
+type ReleaseOptions = {
+  platform: string
+  arch: string
+  target: string
+  archive: string
+  owner: string
+}
+
+function parseArgs(argv: string[]): ReleaseOptions {
+  const options: Partial<ReleaseOptions> & Pick<ReleaseOptions, 'owner'> = {
     owner: 'tomatitito/awb',
   }
 
@@ -23,13 +27,13 @@ function parseArgs(argv) {
   }
 
   if (!options.platform || !options.arch || !options.target || !options.archive) {
-    throw new Error('Usage: build-release-artifact.mjs --platform=<platform> --arch=<arch> --target=<bun-target> --archive=<tar.gz|zip> [--owner=<owner/repo>]')
+    throw new Error('Usage: build-release-artifact.ts --platform=<platform> --arch=<arch> --target=<bun-target> --archive=<tar.gz|zip> [--owner=<owner/repo>]')
   }
 
-  return options
+  return options as ReleaseOptions
 }
 
-async function run(command, args, options = {}) {
+async function run(command: string, args: string[], options: Parameters<typeof spawn>[2] = {}) {
   await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: 'inherit',

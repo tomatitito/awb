@@ -8,7 +8,7 @@
     "awb": "dist/cli.js"
   },
   "scripts": {
-    "postinstall": "node scripts/fix-vite-esbuild.mjs",
+    "postinstall": "bun scripts/fix-vite-esbuild.ts",
     "build": "vite build && tsc -p tsconfig.json",
     "build:web": "vite build",
     "build:node": "tsc -p tsconfig.json",
@@ -46,6 +46,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "esbuild": "0.25.12",
+    "lightningcss": "^1.32.0",
     "tsx": "4.21.0",
     "typescript": "6.0.3",
     "vite": "6.4.2"
