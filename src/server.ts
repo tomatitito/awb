@@ -11,6 +11,7 @@ import { LoginController } from './agent/LoginController.js'
 import type { AgentRunEvent, SelectedTicketContext } from './agent/types.js'
 import { GitWorktreeManager } from './agent/worktree.js'
 import { loadTickets } from './core/loadTickets.js'
+import { discoverSelectableProjects } from './projects.js'
 
 export type StartServerOptions = {
   projectDir: string
@@ -135,6 +136,11 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   app.get('/api/tickets', (_request, response) => {
     response.json(data)
+  })
+
+  app.get('/api/projects', async (_request, response) => {
+    const discovery = await discoverSelectableProjects()
+    response.json(discovery)
   })
 
   app.get('/api/events', (_request, response) => {
