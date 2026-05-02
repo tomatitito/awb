@@ -89,7 +89,7 @@ jobs:
             arch: x64
             target: bun-linux-x64
             archive: tar.gz
-          - runner: macos-13
+          - runner: macos-14
             platform: darwin
             arch: x64
             target: bun-darwin-x64
@@ -171,6 +171,7 @@ jobs:
           - Added desktop and mobile workspace header project selectors
           - Project switches reload tickets, graph data, statuses, stats, and project-scoped agent/run state
           - Malformed, empty, missing, or stale project config is handled gracefully with warnings where appropriate
+          - macOS x64 release artifacts now build on the macOS 14 runner to avoid unavailable macOS 13 queue capacity
 
           ## Configuration
 
