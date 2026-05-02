@@ -162,31 +162,25 @@ jobs:
           cat <<EOF > release-notes.md
           # AWB v${VERSION}
 
-          This release adds an explicit `awb self-update` command for supported standalone installs.
+          This release adds dynamic project selection so AWB can switch between configured ticket workspaces without restarting.
 
           ## Highlights
 
-          - Added `awb self-update`
-          - AWB never updates itself automatically without explicit user action
-          - Self-update is supported for managed GitHub Release installs
-          - Downloaded release artifacts are checksum-verified before replacement
-          - Executable replacement uses a safe, recoverable swap
-          - Unsupported install methods now return clear manual upgrade instructions
+          - Added user-level project discovery via an explicit allowlist
+          - Added safe runtime project switching through the AWB server
+          - Added desktop and mobile workspace header project selectors
+          - Project switches reload tickets, graph data, statuses, stats, and project-scoped agent/run state
+          - Malformed, empty, missing, or stale project config is handled gracefully with warnings where appropriate
 
-          ## Unsupported install methods
+          ## Configuration
 
-          For Bun, npm, source checkouts, and unknown or package-manager-managed installs, AWB will not attempt to overwrite the installation and will instead print manual upgrade guidance.
-
-          Examples:
-
-          - `bun install -g awb@latest`
-          - `npm install -g awb@latest`
+          Selectable projects are configured in the AWB user config file with a `projects` allowlist. See the README for supported config locations and schema.
 
           ## Verification and safety
 
-          - release archives are selected by platform and architecture
-          - SHA-256 checksum verification is required before install
-          - failed replacement attempts leave the existing executable usable
+          - only allowlisted projects can be selected
+          - failed switches leave the current project active and usable
+          - tests and documentation cover discovery, switching, selector display, and edge cases
           EOF
 
       - name: Publish GitHub release
