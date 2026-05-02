@@ -10,8 +10,10 @@ import { createPiSession } from './agent/createPiSession.js'
 import { LoginController } from './agent/LoginController.js'
 import type { AgentRunEvent, SelectedTicketContext } from './agent/types.js'
 import { GitWorktreeManager } from './agent/worktree.js'
+import { loadAwbSettings } from './config.js'
 import { loadTickets } from './core/loadTickets.js'
 import { discoverSelectableProjects } from './projects.js'
+import { ProjectRuntimeManager } from './server/projectRuntime.js'
 
 export type StartServerOptions = {
   projectDir: string
@@ -20,6 +22,7 @@ export type StartServerOptions = {
   dev?: boolean
   editorCommand?: string
   worktreeIsolationEnabled?: boolean
+  projectDiscoveryConfigDir?: string
 }
 
 export async function startServer(options: StartServerOptions): Promise<{ server: Server; url: string }> {
@@ -28,8 +31,6 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   const currentDir = path.dirname(fileURLToPath(import.meta.url))
   const webDir = path.resolve(currentDir, '../dist/web')
-  const absoluteTicketsDir = path.resolve(options.projectDir, options.ticketsDir)
-  let data = await loadTickets(options.projectDir, options.ticketsDir)
   const liveReloadClients = new Set<ServerResponse>()
   const legacyAgentClients = new Set<ServerResponse>()
   const allRunClients = new Set<ServerResponse>()
@@ -37,66 +38,39 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   const authStorage = AuthStorage.create()
   const modelRegistry = ModelRegistry.create(authStorage)
   const now = () => Date.now()
-  const worktreeManager = new GitWorktreeManager(options.projectDir, {
-    enabled: Boolean(options.worktreeIsolationEnabled),
-    now,
-  })
-  const agentController = new AgentController(options.projectDir, {
-    createSession: createPiSession,
-    createRunId: () => crypto.randomUUID(),
-    now,
-    loginController: new LoginController({ authStorage, modelRegistry, now }),
-    credentialProvider: authStorage,
-    modelRegistry,
-    worktreeManager,
-    editorCommand: options.editorCommand,
-  })
-  await agentController.ensureStarted()
-  let reloadTimer: ReturnType<typeof setTimeout> | undefined
+  let runtime: ProjectRuntimeManager
 
-  const notifyClients = (event: 'reload' | 'reload-error', payload: Record<string, unknown>) => {
+  function writeSseEvent(response: ServerResponse, event: string, payload: unknown) {
+    response.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`)
+  }
+
+  function notifyClients(event: 'reload' | 'reload-error', payload: Record<string, unknown>) {
     const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
     for (const client of liveReloadClients) {
       client.write(body)
     }
   }
 
-  const reloadTickets = async () => {
-    try {
-      data = await loadTickets(options.projectDir, options.ticketsDir)
-      notifyClients('reload', {
-        ticketCount: data.tickets.length,
-        ticketsDir: data.ticketsDir,
-        updatedAt: new Date().toISOString(),
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      console.error(`awb: failed to reload tickets from ${absoluteTicketsDir}: ${message}`)
-      notifyClients('reload-error', {
-        message,
-        updatedAt: new Date().toISOString(),
-      })
+  function closeRunDetailClients() {
+    for (const clients of runClients.values()) {
+      for (const client of clients) {
+        client.end()
+      }
+    }
+    runClients.clear()
+  }
+
+  function broadcastAgentStateReset() {
+    const controllerState = runtime.agentController.getState()
+    for (const client of allRunClients) {
+      writeSseEvent(client, 'ready', { type: 'ready', runs: runtime.agentController.listRuns() })
+    }
+    for (const client of legacyAgentClients) {
+      writeSseEvent(client, 'ready', { type: 'ready', state: controllerState })
     }
   }
 
-  const scheduleReload = () => {
-    if (reloadTimer) clearTimeout(reloadTimer)
-    reloadTimer = setTimeout(() => {
-      void reloadTickets()
-    }, 100)
-  }
-
-  const watcher = fs.watch(absoluteTicketsDir, (_eventType, filename) => {
-    if (!filename || filename.toString().endsWith('.md')) {
-      scheduleReload()
-    }
-  })
-
-  const writeSseEvent = (response: ServerResponse, event: string, payload: unknown) => {
-    response.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`)
-  }
-
-  const broadcastRunEvent = (event: AgentRunEvent) => {
+  function broadcastRunEvent(event: AgentRunEvent) {
     for (const client of allRunClients) {
       writeSseEvent(client, event.type, event)
     }
@@ -119,28 +93,75 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     }
   }
 
-  const unsubscribeAgent = agentController.subscribe((event) => {
-    broadcastRunEvent(event)
-  })
-
-  const getTicketContext = (ticketId: string) => {
-    const ticket = data.tickets.find((entry) => entry.id === ticketId)
-    if (!ticket) return undefined
-    return {
-      ticketId: ticket.id,
-      title: ticket.title,
-      body: ticket.body,
-      filePath: ticket.filePath,
-    }
-  }
+  runtime = await ProjectRuntimeManager.create(
+    {
+      projectDir: options.projectDir,
+      ticketsDir: options.ticketsDir,
+      editorCommand: options.editorCommand,
+    },
+    {
+      loadTickets,
+      loadAwbSettings,
+      watch: fs.watch,
+      createAgentController: (projectDir, controllerOptions) => new AgentController(projectDir, controllerOptions),
+      createWorktreeManager: (projectDir, worktreeOptions) => new GitWorktreeManager(projectDir, worktreeOptions),
+      createLoginController: (loginOptions) => new LoginController(loginOptions),
+      createSession: createPiSession,
+      createRunId: () => crypto.randomUUID(),
+      now,
+      toIsoString: () => new Date().toISOString(),
+      authStorage,
+      modelRegistry,
+      onReload: (payload) => notifyClients('reload', payload),
+      onReloadError: (payload) => notifyClients('reload-error', payload),
+      onAgentEvent: broadcastRunEvent,
+      onReloadFailure: (absoluteTicketsDir, message) => {
+        console.error(`awb: failed to reload tickets from ${absoluteTicketsDir}: ${message}`)
+      },
+    },
+  )
 
   app.get('/api/tickets', (_request, response) => {
-    response.json(data)
+    response.json(runtime.data)
   })
 
   app.get('/api/projects', async (_request, response) => {
-    const discovery = await discoverSelectableProjects()
-    response.json(discovery)
+    const discovery = await discoverSelectableProjects({ configDir: options.projectDiscoveryConfigDir })
+    response.json({
+      ...discovery,
+      activeProjectRoot: runtime.projectDir,
+      activeTicketsDir: runtime.ticketsDir,
+    })
+  })
+
+  app.post('/api/projects/switch', async (request, response) => {
+    const root = typeof request.body?.root === 'string' ? request.body.root.trim() : ''
+    if (!root) {
+      response.status(400).json({ message: 'root is required.' })
+      return
+    }
+
+    const discovery = await discoverSelectableProjects({ configDir: options.projectDiscoveryConfigDir })
+    const project = discovery.projects.find((entry) => entry.root === path.resolve(root))
+    if (!project) {
+      response.status(404).json({ message: `Project ${root} is not in the AWB project allowlist.` })
+      return
+    }
+
+    try {
+      const reloadPayload = await runtime.switchProject(project.root)
+      closeRunDetailClients()
+      broadcastAgentStateReset()
+      notifyClients('reload', reloadPayload)
+      response.status(202).json({
+        ok: true,
+        projectDir: runtime.data.projectDir,
+        ticketsDir: runtime.data.ticketsDir,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      response.status(409).json({ message })
+    }
   })
 
   app.get('/api/events', (_request, response) => {
@@ -148,7 +169,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     response.setHeader('Cache-Control', 'no-cache, no-transform')
     response.setHeader('Connection', 'keep-alive')
     response.flushHeaders()
-    response.write(`event: ready\ndata: ${JSON.stringify({ ticketsDir: data.ticketsDir })}\n\n`)
+    response.write(`event: ready\ndata: ${JSON.stringify({ ticketsDir: runtime.data.ticketsDir })}\n\n`)
 
     liveReloadClients.add(response)
     _request.on('close', () => {
@@ -157,7 +178,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/runs', (_request, response) => {
-    response.json({ runs: agentController.listRuns() })
+    response.json({ runs: runtime.agentController.listRuns() })
   })
 
   app.post('/api/agent/runs', async (request, response) => {
@@ -167,13 +188,13 @@ export async function startServer(options: StartServerOptions): Promise<{ server
       return
     }
 
-    const ticket = getTicketContext(ticketId)
+    const ticket = runtime.getTicketContext(ticketId)
     if (!ticket) {
       response.status(404).json({ message: `Ticket ${ticketId} was not found.` })
       return
     }
 
-    const run = await agentController.createRun(ticket)
+    const run = await runtime.agentController.createRun(ticket)
     response.status(201).json({ run })
   })
 
@@ -182,7 +203,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     response.setHeader('Cache-Control', 'no-cache, no-transform')
     response.setHeader('Connection', 'keep-alive')
     response.flushHeaders()
-    writeSseEvent(response, 'ready', { type: 'ready', runs: agentController.listRuns() })
+    writeSseEvent(response, 'ready', { type: 'ready', runs: runtime.agentController.listRuns() })
 
     allRunClients.add(response)
     _request.on('close', () => {
@@ -191,7 +212,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/runs/:runId', (request, response) => {
-    const run = agentController.getRun(request.params.runId)
+    const run = runtime.agentController.getRun(request.params.runId)
     if (!run) {
       response.status(404).json({ message: `Run ${request.params.runId} was not found.` })
       return
@@ -201,7 +222,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/runs/:runId/events', (request, response) => {
-    const run = agentController.getRun(request.params.runId)
+    const run = runtime.agentController.getRun(request.params.runId)
     if (!run) {
       response.status(404).json({ message: `Run ${request.params.runId} was not found.` })
       return
@@ -236,7 +257,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     }
 
     try {
-      await agentController.promptRun(request.params.runId, text)
+      await runtime.agentController.promptRun(request.params.runId, text)
       response.status(202).json({ ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -247,7 +268,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   app.post('/api/agent/runs/:runId/abort', async (request, response) => {
     try {
-      await agentController.abortRun(request.params.runId)
+      await runtime.agentController.abortRun(request.params.runId)
       response.status(202).json({ ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -258,7 +279,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   app.post('/api/agent/runs/:runId/worktree/open', async (request, response) => {
     try {
-      await agentController.openRunWorktreeInEditor(request.params.runId)
+      await runtime.agentController.openRunWorktreeInEditor(request.params.runId)
       response.status(202).json({ ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -269,7 +290,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   app.post('/api/agent/runs/:runId/worktree/cleanup', async (request, response) => {
     try {
-      const run = await agentController.cleanupRunWorktree(request.params.runId)
+      const run = await runtime.agentController.cleanupRunWorktree(request.params.runId)
       response.status(202).json({ run })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -279,8 +300,8 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/state', async (_request, response) => {
-    await agentController.ensureStarted()
-    response.json(agentController.getState())
+    await runtime.agentController.ensureStarted()
+    response.json(runtime.agentController.getState())
   })
 
   app.get('/api/agent/events', (_request, response) => {
@@ -288,7 +309,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     response.setHeader('Cache-Control', 'no-cache, no-transform')
     response.setHeader('Connection', 'keep-alive')
     response.flushHeaders()
-    writeSseEvent(response, 'ready', { type: 'ready', state: agentController.getState() })
+    writeSseEvent(response, 'ready', { type: 'ready', state: runtime.agentController.getState() })
 
     legacyAgentClients.add(response)
     _request.on('close', () => {
@@ -299,12 +320,12 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   app.post('/api/agent/context', (request, response) => {
     const ticket = request.body as SelectedTicketContext | undefined
     if (!ticket?.ticketId || !ticket.title || !ticket.filePath) {
-      agentController.setSelectedTicket(undefined)
+      runtime.agentController.setSelectedTicket(undefined)
       response.status(204).end()
       return
     }
 
-    agentController.setSelectedTicket({
+    runtime.agentController.setSelectedTicket({
       ticketId: ticket.ticketId,
       title: ticket.title,
       body: ticket.body || '',
@@ -321,7 +342,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     }
 
     try {
-      await agentController.prompt(text)
+      await runtime.agentController.prompt(text)
       response.status(202).json({ ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -331,7 +352,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   app.post('/api/agent/abort', async (_request, response) => {
     try {
-      await agentController.abort()
+      await runtime.agentController.abort()
       response.status(202).json({ ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -340,8 +361,8 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/auth/providers', async (_request, response) => {
-    await agentController.ensureStarted()
-    response.json({ providers: agentController.getAuthProviders() })
+    await runtime.agentController.ensureStarted()
+    response.json({ providers: runtime.agentController.getAuthProviders() })
   })
 
   app.post('/api/agent/auth/login', async (request, response) => {
@@ -352,7 +373,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     }
 
     try {
-      const flow = await agentController.startLogin(providerId)
+      const flow = await runtime.agentController.startLogin(providerId)
       response.status(202).json({ flow })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -361,14 +382,14 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/auth/login', (_request, response) => {
-    response.json({ flow: agentController.getLoginFlow() })
+    response.json({ flow: runtime.agentController.getLoginFlow() })
   })
 
   app.post('/api/agent/auth/login/input', async (request, response) => {
     const value = typeof request.body?.value === 'string' ? request.body.value : ''
 
     try {
-      await agentController.submitLoginInput(value)
+      await runtime.agentController.submitLoginInput(value)
       response.status(202).json({ ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -377,7 +398,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.post('/api/agent/auth/login/cancel', async (_request, response) => {
-    await agentController.cancelLogin()
+    await runtime.agentController.cancelLogin()
     response.status(202).json({ ok: true })
   })
 
@@ -417,31 +438,17 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   server.on('close', () => {
-    if (reloadTimer) clearTimeout(reloadTimer)
-    watcher.close()
-    unsubscribeAgent()
-    agentController.dispose()
+    runtime.dispose()
+    closeRunDetailClients()
     if (closeWebDevServer) {
       void closeWebDevServer()
     }
-    for (const client of liveReloadClients) {
-      client.end()
-    }
-    for (const client of legacyAgentClients) {
-      client.end()
-    }
-    for (const client of allRunClients) {
-      client.end()
-    }
-    for (const clients of runClients.values()) {
-      for (const client of clients) {
-        client.end()
-      }
-    }
+    for (const client of liveReloadClients) client.end()
+    for (const client of legacyAgentClients) client.end()
+    for (const client of allRunClients) client.end()
     liveReloadClients.clear()
     legacyAgentClients.clear()
     allRunClients.clear()
-    runClients.clear()
   })
 
   const address = server.address()

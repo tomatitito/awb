@@ -35,9 +35,9 @@ export function getAwbUserConfigDir(options: { platform?: NodeJS.Platform; env?:
 }
 
 export async function discoverSelectableProjects(
-  options: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv | Record<string, string | undefined>; homeDir?: string } = {},
+  options: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv | Record<string, string | undefined>; homeDir?: string; configDir?: string } = {},
 ): Promise<ProjectDiscoveryResult> {
-  const configDir = getAwbUserConfigDir(options)
+  const configDir = options.configDir ?? getAwbUserConfigDir(options)
   const configPath = path.join(configDir, USER_CONFIG_FILE_NAME)
   const warnings: string[] = []
   const projects: SelectableProject[] = []

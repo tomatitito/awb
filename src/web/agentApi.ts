@@ -1,4 +1,5 @@
 import type { AgentAuthProviderState, AgentLoginFlowState, AgentPanelState, AgentRunState, SelectedTicketContext } from '../agent/types'
+import type { SelectableProject } from '../projects'
 
 async function postJson(url: string, body?: Record<string, unknown>) {
   const response = await fetch(url, {
@@ -107,4 +108,17 @@ export async function submitAgentLoginInput(value: string): Promise<void> {
 
 export async function cancelAgentLogin(): Promise<void> {
   await postJson('/api/agent/auth/login/cancel', {})
+}
+
+export async function fetchAvailableProjects(): Promise<{ activeProjectRoot: string; activeTicketsDir: string; projects: SelectableProject[]; warnings: string[] }> {
+  const response = await fetch('/api/projects')
+  if (!response.ok) {
+    throw new Error(`Failed to load available projects: ${response.status}`)
+  }
+  return response.json()
+}
+
+export async function switchActiveProject(root: string): Promise<{ ok: true; projectDir: string; ticketsDir: string }> {
+  const response = await postJson('/api/projects/switch', { root })
+  return response.json()
 }
