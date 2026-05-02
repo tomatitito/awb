@@ -82,4 +82,16 @@ describe('discoverSelectableProjects', () => {
     expect(result.projects).toEqual([{ root: validProject, label: 'Valid' }])
     expect(result.warnings.length).toBeGreaterThanOrEqual(4)
   })
+
+  test('reports malformed config files and returns an empty project list', async () => {
+    const homeDir = await makeHome()
+    const configDir = getAwbUserConfigDir({ platform: 'linux', env: {}, homeDir })
+    await fs.mkdir(configDir, { recursive: true })
+    await fs.writeFile(path.join(configDir, 'config.json'), '{ invalid json')
+
+    const result = await discoverSelectableProjects({ platform: 'linux', env: {}, homeDir })
+
+    expect(result.projects).toEqual([])
+    expect(result.warnings).toEqual([`Ignoring ${path.join(configDir, 'config.json')} because it could not be parsed.`])
+  })
 })

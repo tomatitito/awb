@@ -84,7 +84,7 @@ awb self-update
 
 AWB reads optional project config from `<project>/.awb/config.json`.
 
-AWB also supports a user-level project discovery allowlist for future project selection.
+AWB also supports a user-level project discovery allowlist for the workspace project selector.
 
 User config file locations:
 
@@ -102,6 +102,20 @@ Example user config:
   ]
 }
 ```
+
+### Multi-project selector behavior
+
+When the user-level allowlist contains projects, AWB shows a project selector in the desktop and mobile workspace headers.
+
+Operational details:
+
+- only projects listed in the user-level `projects` allowlist are selectable
+- switching projects reloads tickets, graph data, statuses, stats, and project-scoped agent/run state
+- the currently active project remains unchanged if a switch fails
+- AWB does **not** currently remember the last selected project or track recent projects between launches
+- if the allowlist is empty or the config file is missing, the selector has no alternate projects to switch to and `/api/projects` returns an empty `projects` array
+- if the config file is malformed, AWB ignores it, returns `warnings` from `/api/projects`, and blocks switching because there are no valid allowlisted targets
+- if an allowlisted project path no longer exists, that entry is skipped and reported in `warnings`
 
 See [`wiki/project-discovery-design.md`](./wiki/project-discovery-design.md) for the project discovery policy and validation rules.
 

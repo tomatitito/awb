@@ -103,6 +103,68 @@ describe('server project switching', () => {
     }
   })
 
+  test('returns an empty project list when no allowlisted projects are configured', async () => {
+    const projectA = await makeProject('project-a', 'Project A')
+    const userConfigRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'awb-user-config-'))
+    tempDirs.push(userConfigRoot)
+
+    const { server, url } = await startServer({
+      projectDir: projectA,
+      ticketsDir: '.tickets',
+      port: 0,
+      projectDiscoveryConfigDir: userConfigRoot,
+    })
+
+    try {
+      const projectsPayload = await fetch(`${url}/api/projects`).then(
+        (response) => response.json() as Promise<{ activeProjectRoot: string; projects: Array<{ root: string }>; warnings: string[] }>,
+      )
+
+      expect(projectsPayload.activeProjectRoot).toBe(path.resolve(projectA))
+      expect(projectsPayload.projects).toEqual([])
+      expect(projectsPayload.warnings).toEqual([])
+
+      const switchResponse = await fetch(`${url}/api/projects/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: path.resolve(projectA) }),
+      })
+      expect(switchResponse.status).toBe(404)
+    } finally {
+      server.close()
+    }
+  })
+
+  test('surfaces malformed project config warnings and blocks switching', async () => {
+    const projectA = await makeProject('project-a', 'Project A')
+    const userConfigRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'awb-user-config-'))
+    tempDirs.push(userConfigRoot)
+    await fs.mkdir(userConfigRoot, { recursive: true })
+    await fs.writeFile(path.join(userConfigRoot, 'config.json'), '{ invalid json')
+
+    const { server, url } = await startServer({
+      projectDir: projectA,
+      ticketsDir: '.tickets',
+      port: 0,
+      projectDiscoveryConfigDir: userConfigRoot,
+    })
+
+    try {
+      const projectsPayload = await fetch(`${url}/api/projects`).then((response) => response.json() as Promise<{ projects: Array<{ root: string }>; warnings: string[] }>)
+      expect(projectsPayload.projects).toEqual([])
+      expect(projectsPayload.warnings).toEqual([`Ignoring ${path.join(userConfigRoot, 'config.json')} because it could not be parsed.`])
+
+      const switchResponse = await fetch(`${url}/api/projects/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: path.resolve(projectA) }),
+      })
+      expect(switchResponse.status).toBe(404)
+    } finally {
+      server.close()
+    }
+  })
+
   test('failed switches leave the current project usable', async () => {
     const projectA = await makeProject('project-a', 'Project A')
     const userConfigRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'awb-user-config-'))
