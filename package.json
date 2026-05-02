@@ -13,6 +13,7 @@
     "build:web": "vite build",
     "build:node": "tsc -p tsconfig.json",
     "check": "biome check src/ tests/",
+    "check:deps": "depcruise --config .dependency-cruiser.cjs src/web",
     "check:fix": "biome check src/ tests/ --write",
     "dev": "bun src/cli.ts --dev",
     "start": "bun dist/cli.js"
@@ -45,6 +46,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
+    "dependency-cruiser": "^17.4.0",
     "esbuild": "0.25.12",
     "lightningcss": "^1.32.0",
     "tsx": "4.21.0",

@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import type { AgentPanelState, AgentRunState } from '../agent/types'
 import type { VisibleGraphDerivation } from '../core/graph'
 import type { DerivedTicket } from '../core/types'
+import type { SelectableProject } from '../projects'
 import { AgentPanel } from './AgentPanel'
 import { createDefaultSidebarFilters, normalizeFilterValue, type SidebarFilters, UNGROUPED_EPIC_FILTER } from './filtering'
 import type { AgentTranscriptEntry, ToolActivityEntry } from './useAgentPanel'
@@ -75,6 +76,85 @@ function formatRunCountLabel(count: number): string {
   return `${count} active ${count === 1 ? 'run' : 'runs'}`
 }
 
+export function getProjectOptionLabel(project: SelectableProject): string {
+  if (project.label?.trim()) return project.label.trim()
+  const normalized = project.root.replaceAll('\\', '/')
+  const segments = normalized.split('/').filter(Boolean)
+  const baseName = segments.at(-1)
+  return baseName || project.root
+}
+
+export function formatProjectDisplayPath(projectDir: string, maxLength = 52): string {
+  if (projectDir.length <= maxLength) return projectDir
+
+  const normalized = projectDir.replaceAll('\\', '/')
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments.length === 0) return `${projectDir.slice(0, Math.max(0, maxLength - 1))}…`
+
+  const tailSegments = segments.slice(-2)
+  return `…/${tailSegments.join('/')}`
+}
+
+function ProjectSelector({
+  projectDir,
+  projects,
+  activeProjectRoot,
+  isSwitchingProject,
+  projectSwitchError,
+  onProjectChange,
+  mobile,
+}: {
+  projectDir: string
+  projects: SelectableProject[]
+  activeProjectRoot: string
+  isSwitchingProject: boolean
+  projectSwitchError?: string
+  onProjectChange: (root: string) => void
+  mobile?: boolean
+}) {
+  const activeProject = projects.find((project) => project.root === activeProjectRoot)
+  const selectorClassName = mobile ? 'project-selector mobile-project-selector' : 'project-selector'
+  const displayPath = projectDir ? formatProjectDisplayPath(projectDir) : 'Select a project…'
+  const selectorProjects = activeProjectRoot && !activeProject ? [{ root: activeProjectRoot }, ...projects] : projects
+  const selectorId = mobile ? 'mobile-project-selector' : 'desktop-project-selector'
+
+  return (
+    <div className={selectorClassName} title={projectDir}>
+      <label className="project-selector-label" htmlFor={selectorId}>
+        Project
+      </label>
+      <div className="project-selector-summary">
+        <select
+          id={selectorId}
+          className="project-selector-control"
+          data-awb={mobile ? 'mobile-project-selector' : 'project-selector'}
+          value={activeProjectRoot}
+          aria-label="Select project"
+          aria-busy={isSwitchingProject}
+          disabled={isSwitchingProject || selectorProjects.length === 0}
+          onChange={(event) => onProjectChange(event.target.value)}
+        >
+          {!activeProjectRoot ? <option value="">Select a project…</option> : null}
+          {selectorProjects.map((project) => (
+            <option key={project.root} value={project.root}>
+              {getProjectOptionLabel(project)}
+            </option>
+          ))}
+        </select>
+        <span className="project-selector-path" title={projectDir || undefined}>
+          {displayPath}
+        </span>
+      </div>
+      {isSwitchingProject ? (
+        <div className="project-selector-status" role="status" aria-live="polite">
+          Switching project…
+        </div>
+      ) : null}
+      {projectSwitchError ? <div className="project-selector-error">{projectSwitchError}</div> : null}
+    </div>
+  )
+}
+
 function EpicFilterSelect({
   epics,
   filters,
@@ -103,6 +183,11 @@ function EpicFilterSelect({
 
 export function WorkspaceTopBar({
   projectDir,
+  projects,
+  activeProjectRoot,
+  isSwitchingProject,
+  projectSwitchError,
+  onProjectChange,
   search,
   onSearchChange,
   hideClosed,
@@ -114,6 +199,11 @@ export function WorkspaceTopBar({
   agentToggleLabel,
 }: {
   projectDir: string
+  projects: SelectableProject[]
+  activeProjectRoot: string
+  isSwitchingProject: boolean
+  projectSwitchError?: string
+  onProjectChange: (root: string) => void
   search: string
   onSearchChange: (value: string) => void
   hideClosed: boolean
@@ -126,11 +216,18 @@ export function WorkspaceTopBar({
 }) {
   return (
     <header className="topbar">
-      <div>
+      <div className="topbar-branding">
         <h1>
           <span className="product-badge">AWB</span> agentic workbench
         </h1>
-        <div className="project-path">{projectDir}</div>
+        <ProjectSelector
+          projectDir={projectDir}
+          projects={projects}
+          activeProjectRoot={activeProjectRoot}
+          isSwitchingProject={isSwitchingProject}
+          projectSwitchError={projectSwitchError}
+          onProjectChange={onProjectChange}
+        />
       </div>
       <div className="toolbar">
         <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search id or title" />
@@ -230,6 +327,11 @@ export function WorkspaceTabsHeader({
 
 export function MobileWorkspaceHeader({
   projectDir,
+  projects,
+  activeProjectRoot,
+  isSwitchingProject,
+  projectSwitchError,
+  onProjectChange,
   search,
   onSearchChange,
   hideClosed,
@@ -252,6 +354,11 @@ export function MobileWorkspaceHeader({
   onFiltersChange,
 }: {
   projectDir: string
+  projects: SelectableProject[]
+  activeProjectRoot: string
+  isSwitchingProject: boolean
+  projectSwitchError?: string
+  onProjectChange: (root: string) => void
   search: string
   onSearchChange: (value: string) => void
   hideClosed: boolean
@@ -280,9 +387,15 @@ export function MobileWorkspaceHeader({
           <h1>
             <span className="product-badge">AWB</span> workbench
           </h1>
-          <div className="project-path" title={projectDir}>
-            {projectDir}
-          </div>
+          <ProjectSelector
+            projectDir={projectDir}
+            projects={projects}
+            activeProjectRoot={activeProjectRoot}
+            isSwitchingProject={isSwitchingProject}
+            projectSwitchError={projectSwitchError}
+            onProjectChange={onProjectChange}
+            mobile
+          />
         </div>
         <div className="mobile-header-actions">
           <button

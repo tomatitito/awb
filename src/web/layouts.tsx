@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { AgentPanelState, AgentRunState } from '../agent/types'
 import type { VisibleGraphDerivation } from '../core/graph'
 import type { DerivedTicket } from '../core/types'
+import type { SelectableProject } from '../projects'
 import { AgentPanel } from './AgentPanel'
 import type { SidebarFilters } from './filtering'
 import { closeMobileAgentOverlay, openMobileDetailsForTicket } from './mobileFlow'
@@ -24,6 +25,11 @@ import {
 export type WorkspaceLayoutProps = {
   viewportMode: ViewportMode
   projectDir: string
+  projects: SelectableProject[]
+  activeProjectRoot: string
+  isSwitchingProject: boolean
+  projectSwitchError?: string
+  onProjectChange: (root: string) => void
   tab: TabKey
   onTabChange: (tab: TabKey) => void
   search: string
@@ -96,6 +102,11 @@ function WorkspaceChrome({
   children,
   viewportMode,
   projectDir,
+  projects,
+  activeProjectRoot,
+  isSwitchingProject,
+  projectSwitchError,
+  onProjectChange,
   tab,
   onTabChange,
   search,
@@ -117,6 +128,11 @@ function WorkspaceChrome({
   WorkspaceLayoutProps,
   | 'viewportMode'
   | 'projectDir'
+  | 'projects'
+  | 'activeProjectRoot'
+  | 'isSwitchingProject'
+  | 'projectSwitchError'
+  | 'onProjectChange'
   | 'tab'
   | 'onTabChange'
   | 'search'
@@ -142,6 +158,11 @@ function WorkspaceChrome({
       {viewportMode === 'mobile' ? (
         <MobileWorkspaceHeader
           projectDir={projectDir}
+          projects={projects}
+          activeProjectRoot={activeProjectRoot}
+          isSwitchingProject={isSwitchingProject}
+          projectSwitchError={projectSwitchError}
+          onProjectChange={onProjectChange}
           search={search}
           onSearchChange={onSearchChange}
           hideClosed={hideClosed}
@@ -167,6 +188,11 @@ function WorkspaceChrome({
         <>
           <WorkspaceTopBar
             projectDir={projectDir}
+            projects={projects}
+            activeProjectRoot={activeProjectRoot}
+            isSwitchingProject={isSwitchingProject}
+            projectSwitchError={projectSwitchError}
+            onProjectChange={onProjectChange}
             search={search}
             onSearchChange={onSearchChange}
             hideClosed={hideClosed}

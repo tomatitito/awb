@@ -2,7 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentRunEvent, AgentRunState } from '../agent/types'
 import { deriveVisibleGraph } from '../core/graph'
 import type { AppData } from '../core/types'
-import { abortSpecificAgentRun, cleanupAgentRunWorktree, createAgentRun, listAgentRuns, openAgentRunWorktree, sendAgentRunPrompt } from './agentApi'
+import type { SelectableProject } from '../projects'
+import {
+  abortSpecificAgentRun,
+  cleanupAgentRunWorktree,
+  createAgentRun,
+  fetchAvailableProjects,
+  listAgentRuns,
+  openAgentRunWorktree,
+  sendAgentRunPrompt,
+  switchActiveProject,
+} from './agentApi'
 import { createDefaultSidebarFilters, getAvailableStatuses, getEpicTickets, getVisibleKanbanTickets, getVisibleTickets, type SidebarFilters } from './filtering'
 import { ResponsiveWorkspaceLayout } from './layouts'
 import { openAgentPanelFromHeader } from './mobileFlow'
@@ -12,6 +22,10 @@ import { compareStatuses, type GraphDirection, matchesSearch, type TabKey } from
 
 export default function App() {
   const [data, setData] = useState<AppData | null>(null)
+  const [projects, setProjects] = useState<SelectableProject[]>([])
+  const [activeProjectRoot, setActiveProjectRoot] = useState('')
+  const [projectSwitchError, setProjectSwitchError] = useState<string | undefined>()
+  const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const [tab, setTab] = useState<TabKey>('graph')
   const [lastActiveWorkspaceTab, setLastActiveWorkspaceTab] = useState<TabKey>('graph')
   const [selectedId, setSelectedId] = useState<string | undefined>()
@@ -51,6 +65,7 @@ export default function App() {
         const response = await fetch('/api/tickets')
         const payload: AppData = await response.json()
         setData(payload)
+        setActiveProjectRoot(payload.projectDir)
         setSelectedId((currentSelectedId) => {
           const stillExists = currentSelectedId && payload.tickets.some((ticket) => ticket.id === currentSelectedId)
           if (stillExists) return currentSelectedId
@@ -72,13 +87,25 @@ export default function App() {
       }
     }
 
+    const loadProjects = async () => {
+      try {
+        const payload = await fetchAvailableProjects()
+        setProjects(payload.projects)
+        setActiveProjectRoot(payload.activeProjectRoot)
+      } catch (error) {
+        console.error('Failed to load available projects', error)
+      }
+    }
+
     void loadData()
     void loadRuns()
+    void loadProjects()
 
     const eventSource = new EventSource('/api/events')
     const runEventSource = new EventSource('/api/agent/runs/events')
     const handleReload = () => {
       void loadData()
+      void loadProjects()
     }
     const handleReloadError = (event: MessageEvent<string>) => {
       console.error('Ticket reload failed', event.data)
@@ -195,6 +222,36 @@ export default function App() {
   const epicTickets = getEpicTickets(data.tickets)
   const ticketById = new Map(data.tickets.map((ticket) => [ticket.id, ticket]))
 
+  const handleProjectChange = async (root: string) => {
+    if (!root || root === activeProjectRoot || isSwitchingProject) return
+
+    setProjectSwitchError(undefined)
+    setIsSwitchingProject(true)
+
+    try {
+      const result = await switchActiveProject(root)
+      setActiveProjectRoot(result.projectDir)
+      const [projectsPayload, runs] = await Promise.all([fetchAvailableProjects(), listAgentRuns()])
+      setProjects(projectsPayload.projects)
+      setActiveProjectRoot(projectsPayload.activeProjectRoot)
+      setAgentRuns(runs)
+
+      const response = await fetch('/api/tickets')
+      const payload: AppData = await response.json()
+      setData(payload)
+      setSelectedId((currentSelectedId) => {
+        const stillExists = currentSelectedId && payload.tickets.some((ticket) => ticket.id === currentSelectedId)
+        if (stillExists) return currentSelectedId
+        const firstReady = payload.tickets.find((ticket) => ticket.ready)
+        return firstReady?.id || payload.tickets[0]?.id
+      })
+    } catch (error) {
+      setProjectSwitchError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setIsSwitchingProject(false)
+    }
+  }
+
   const handleStartAgentRun = async (ticketId: string) => {
     if (runLockTicketIdsRef.current.has(ticketId)) return
 
@@ -228,6 +285,11 @@ export default function App() {
     <ResponsiveWorkspaceLayout
       viewportMode={viewportMode}
       projectDir={data.projectDir}
+      projects={projects}
+      activeProjectRoot={activeProjectRoot || data.projectDir}
+      isSwitchingProject={isSwitchingProject}
+      projectSwitchError={projectSwitchError}
+      onProjectChange={handleProjectChange}
       tab={tab}
       onTabChange={setTab}
       search={search}
