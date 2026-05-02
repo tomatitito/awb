@@ -1,19 +1,20 @@
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
-import type { Server, ServerResponse } from 'node:http'
+import type { Server } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AuthStorage, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import express from 'express'
-import { AgentController, toLegacyPanelEvent } from './agent/AgentController.js'
+import { AgentController } from './agent/AgentController.js'
 import { createPiSession } from './agent/createPiSession.js'
 import { LoginController } from './agent/LoginController.js'
-import type { AgentRunEvent, SelectedTicketContext } from './agent/types.js'
+import type { SelectedTicketContext } from './agent/types.js'
 import { GitWorktreeManager } from './agent/worktree.js'
 import { loadAwbSettings } from './config.js'
 import { loadTickets } from './core/loadTickets.js'
 import { discoverSelectableProjects } from './projects.js'
 import { ProjectRuntimeManager } from './server/projectRuntime.js'
+import { AgentEventsHub, TicketEventsHub } from './server/sse.js'
 
 export type StartServerOptions = {
   projectDir: string
@@ -31,67 +32,12 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   const currentDir = path.dirname(fileURLToPath(import.meta.url))
   const webDir = path.resolve(currentDir, '../dist/web')
-  const liveReloadClients = new Set<ServerResponse>()
-  const legacyAgentClients = new Set<ServerResponse>()
-  const allRunClients = new Set<ServerResponse>()
-  const runClients = new Map<string, Set<ServerResponse>>()
+  const ticketEvents = new TicketEventsHub()
+  const agentEvents = new AgentEventsHub()
   const authStorage = AuthStorage.create()
   const modelRegistry = ModelRegistry.create(authStorage)
   const now = () => Date.now()
   let runtime: ProjectRuntimeManager
-
-  function writeSseEvent(response: ServerResponse, event: string, payload: unknown) {
-    response.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`)
-  }
-
-  function notifyClients(event: 'reload' | 'reload-error', payload: Record<string, unknown>) {
-    const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
-    for (const client of liveReloadClients) {
-      client.write(body)
-    }
-  }
-
-  function closeRunDetailClients() {
-    for (const clients of runClients.values()) {
-      for (const client of clients) {
-        client.end()
-      }
-    }
-    runClients.clear()
-  }
-
-  function broadcastAgentStateReset() {
-    const controllerState = runtime.agentController.getState()
-    for (const client of allRunClients) {
-      writeSseEvent(client, 'ready', { type: 'ready', runs: runtime.agentController.listRuns() })
-    }
-    for (const client of legacyAgentClients) {
-      writeSseEvent(client, 'ready', { type: 'ready', state: controllerState })
-    }
-  }
-
-  function broadcastRunEvent(event: AgentRunEvent) {
-    for (const client of allRunClients) {
-      writeSseEvent(client, event.type, event)
-    }
-    if ('runId' in event) {
-      for (const client of runClients.get(event.runId) ?? []) {
-        writeSseEvent(client, event.type, event)
-      }
-    }
-    if ('run' in event) {
-      for (const client of runClients.get(event.run.id) ?? []) {
-        writeSseEvent(client, event.type, event)
-      }
-    }
-
-    const legacyEvent = toLegacyPanelEvent(event)
-    if (legacyEvent) {
-      for (const client of legacyAgentClients) {
-        writeSseEvent(client, legacyEvent.type, legacyEvent)
-      }
-    }
-  }
 
   runtime = await ProjectRuntimeManager.create(
     {
@@ -112,9 +58,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
       toIsoString: () => new Date().toISOString(),
       authStorage,
       modelRegistry,
-      onReload: (payload) => notifyClients('reload', payload),
-      onReloadError: (payload) => notifyClients('reload-error', payload),
-      onAgentEvent: broadcastRunEvent,
+      onReload: (payload) => ticketEvents.notify('reload', payload),
+      onReloadError: (payload) => ticketEvents.notify('reload-error', payload),
+      onAgentEvent: (event) => agentEvents.broadcastRunEvent(event),
       onReloadFailure: (absoluteTicketsDir, message) => {
         console.error(`awb: failed to reload tickets from ${absoluteTicketsDir}: ${message}`)
       },
@@ -150,9 +96,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
     try {
       const reloadPayload = await runtime.switchProject(project.root)
-      closeRunDetailClients()
-      broadcastAgentStateReset()
-      notifyClients('reload', reloadPayload)
+      agentEvents.closeRunDetailClients()
+      agentEvents.broadcastStateReset(runtime.agentController.listRuns(), runtime.agentController.getState())
+      ticketEvents.notify('reload', reloadPayload)
       response.status(202).json({
         ok: true,
         projectDir: runtime.data.projectDir,
@@ -165,15 +111,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/events', (_request, response) => {
-    response.setHeader('Content-Type', 'text/event-stream')
-    response.setHeader('Cache-Control', 'no-cache, no-transform')
-    response.setHeader('Connection', 'keep-alive')
-    response.flushHeaders()
-    response.write(`event: ready\ndata: ${JSON.stringify({ ticketsDir: runtime.data.ticketsDir })}\n\n`)
-
-    liveReloadClients.add(response)
+    ticketEvents.addClient(response, { ticketsDir: runtime.data.ticketsDir })
     _request.on('close', () => {
-      liveReloadClients.delete(response)
+      ticketEvents.removeClient(response)
     })
   })
 
@@ -199,15 +139,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/runs/events', (_request, response) => {
-    response.setHeader('Content-Type', 'text/event-stream')
-    response.setHeader('Cache-Control', 'no-cache, no-transform')
-    response.setHeader('Connection', 'keep-alive')
-    response.flushHeaders()
-    writeSseEvent(response, 'ready', { type: 'ready', runs: runtime.agentController.listRuns() })
-
-    allRunClients.add(response)
+    agentEvents.addAllRunsClient(response, runtime.agentController.listRuns())
     _request.on('close', () => {
-      allRunClients.delete(response)
+      agentEvents.removeAllRunsClient(response)
     })
   })
 
@@ -228,24 +162,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
       return
     }
 
-    response.setHeader('Content-Type', 'text/event-stream')
-    response.setHeader('Cache-Control', 'no-cache, no-transform')
-    response.setHeader('Connection', 'keep-alive')
-    response.flushHeaders()
-    writeSseEvent(response, 'ready', { type: 'ready', run })
-
-    let clients = runClients.get(run.id)
-    if (!clients) {
-      clients = new Set()
-      runClients.set(run.id, clients)
-    }
-    clients.add(response)
-
+    agentEvents.addRunDetailClient(response, run)
     request.on('close', () => {
-      clients?.delete(response)
-      if (clients && clients.size === 0) {
-        runClients.delete(run.id)
-      }
+      agentEvents.removeRunDetailClient(run.id, response)
     })
   })
 
@@ -305,15 +224,9 @@ export async function startServer(options: StartServerOptions): Promise<{ server
   })
 
   app.get('/api/agent/events', (_request, response) => {
-    response.setHeader('Content-Type', 'text/event-stream')
-    response.setHeader('Cache-Control', 'no-cache, no-transform')
-    response.setHeader('Connection', 'keep-alive')
-    response.flushHeaders()
-    writeSseEvent(response, 'ready', { type: 'ready', state: runtime.agentController.getState() })
-
-    legacyAgentClients.add(response)
+    agentEvents.addLegacyClient(response, runtime.agentController.getState())
     _request.on('close', () => {
-      legacyAgentClients.delete(response)
+      agentEvents.removeLegacyClient(response)
     })
   })
 
@@ -439,16 +352,11 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   server.on('close', () => {
     runtime.dispose()
-    closeRunDetailClients()
     if (closeWebDevServer) {
       void closeWebDevServer()
     }
-    for (const client of liveReloadClients) client.end()
-    for (const client of legacyAgentClients) client.end()
-    for (const client of allRunClients) client.end()
-    liveReloadClients.clear()
-    legacyAgentClients.clear()
-    allRunClients.clear()
+    ticketEvents.closeAll()
+    agentEvents.closeAll()
   })
 
   const address = server.address()
