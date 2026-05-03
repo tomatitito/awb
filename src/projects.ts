@@ -23,15 +23,16 @@ export function getAwbUserConfigDir(options: { platform?: NodeJS.Platform; env?:
   const platform = options.platform ?? process.platform
   const env = options.env ?? process.env
   const homeDir = options.homeDir ?? os.homedir()
+  const xdgConfigHome = env.XDG_CONFIG_HOME
 
-  if (platform === 'darwin') return path.join(homeDir, 'Library', 'Application Support', 'awb')
   if (platform === 'win32') {
     const appData = env.APPDATA
     return appData ? path.join(appData, 'awb') : path.join(homeDir, 'AppData', 'Roaming', 'awb')
   }
 
-  const xdgConfigHome = env.XDG_CONFIG_HOME
-  return xdgConfigHome ? path.join(xdgConfigHome, 'awb') : path.join(homeDir, '.config', 'awb')
+  if (xdgConfigHome) return path.join(xdgConfigHome, 'awb')
+  if (platform === 'darwin') return path.join(homeDir, 'Library', 'Application Support', 'awb')
+  return path.join(homeDir, '.config', 'awb')
 }
 
 export async function discoverSelectableProjects(

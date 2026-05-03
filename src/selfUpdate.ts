@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { getAwbPiPackageDir } from './runtimeSupport.js'
 import { compareSemver, DEFAULT_RELEASE_CHECK_URL } from './update.js'
 
 const INSTALL_METADATA_FILE_NAME = 'awb-install.json'
@@ -303,10 +304,16 @@ export async function selfUpdateAwb(options: {
       throw new Error(`The downloaded artifact did not contain ${executableName}.`)
     }
 
+    const nextPackageJsonPath = await findRuntimePackageMetadata(extractedDir)
+    if (!nextPackageJsonPath) {
+      throw new Error('The downloaded artifact did not contain pi-package/package.json.')
+    }
+
     await replaceExecutableSafely({
       currentPath: installation.executablePath,
       nextPath: nextExecutablePath,
     })
+    await installRuntimePackageMetadata(nextPackageJsonPath)
 
     return {
       status: 'updated',
@@ -418,6 +425,24 @@ async function runCommand(command: string, args: string[]): Promise<void> {
 async function computeSha256(filePath: string): Promise<string> {
   const content = await fs.readFile(filePath)
   return createHash('sha256').update(content).digest('hex')
+}
+
+async function installRuntimePackageMetadata(packageJsonPath: string): Promise<void> {
+  const packageDir = getAwbPiPackageDir()
+  await fs.mkdir(packageDir, { recursive: true })
+  await fs.copyFile(packageJsonPath, path.join(packageDir, 'package.json'))
+}
+
+async function findRuntimePackageMetadata(rootDir: string): Promise<string | undefined> {
+  const directPath = path.join(rootDir, 'pi-package', 'package.json')
+  try {
+    const stats = await fs.stat(directPath)
+    if (stats.isFile()) return directPath
+  } catch {
+    // fall through to the recursive fallback for older or unexpected archive layouts.
+  }
+
+  return findFileRecursive(rootDir, 'package.json')
 }
 
 async function findFileRecursive(rootDir: string, fileName: string): Promise<string | undefined> {
