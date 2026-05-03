@@ -20,10 +20,7 @@ export function resolveAwbPackageDir(options: { platform?: NodeJS.Platform; env?
 }
 
 export function resolveAwbPackageJsonPath(): string | undefined {
-  const candidates = [
-    process.env[AWB_PACKAGE_DIR_ENV]?.trim(),
-    process.env.PI_PACKAGE_DIR?.trim(),
-  ].filter((value): value is string => Boolean(value))
+  const candidates = [process.env[AWB_PACKAGE_DIR_ENV]?.trim(), process.env.PI_PACKAGE_DIR?.trim()].filter((value): value is string => Boolean(value))
 
   for (const directoryPath of candidates) {
     const packageJsonPath = path.join(directoryPath, 'package.json')
