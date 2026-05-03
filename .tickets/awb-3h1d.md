@@ -1,6 +1,6 @@
 ---
 id: awb-3h1d
-status: open
+status: closed
 deps: [awb-4m8h, awb-q1ng]
 links: []
 created: 2026-05-03T10:33:31Z
