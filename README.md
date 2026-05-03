@@ -19,7 +19,7 @@ Install the latest release into `~/.local/bin`:
 curl -fsSL https://raw.githubusercontent.com/tomatitito/awb/main/install.sh | sh
 ```
 
-The installer detects macOS/Linux and x64/ARM64, downloads the matching latest GitHub release asset, verifies its checksum when available, and copies `awb` into `~/.local/bin`.
+The installer detects macOS/Linux and x64/ARM64, downloads the matching latest GitHub release asset, verifies its checksum when available, installs `awb` into `~/.local/bin`, and installs runtime package metadata into the AWB user config directory under `pi-package/`.
 
 To install somewhere else:
 
@@ -88,9 +88,11 @@ AWB also supports a user-level project discovery allowlist for the workspace pro
 
 User config file locations:
 
-- macOS: `~/Library/Application Support/awb/config.json`
+- macOS: `$XDG_CONFIG_HOME/awb/config.json` when `XDG_CONFIG_HOME` is set, otherwise `~/Library/Application Support/awb/config.json`
 - Linux: `$XDG_CONFIG_HOME/awb/config.json` or `~/.config/awb/config.json`
 - Windows: `%APPDATA%/awb/config.json`
+
+Installed release builds also keep their runtime package metadata beside that config as `pi-package/package.json`.
 
 Example user config:
 
