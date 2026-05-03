@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import open from 'open'
 import { loadAwbSettings } from './config.js'
+import { discoverSelectableProjects } from './projects.js'
 import { selfUpdateAwb } from './selfUpdate.js'
 import { startServer } from './server.js'
 import { checkForAwbUpdates, formatUpdateNotice } from './update.js'
@@ -14,6 +15,7 @@ type CliOptions = {
   port: number
   shouldOpen: boolean
   dev: boolean
+  projectDirExplicit: boolean
   editorOverride?: string
   command?: 'serve' | 'check-for-updates' | 'self-update'
 }
@@ -25,6 +27,7 @@ function parseArgs(argv: string[]): CliOptions {
     port: 4312,
     shouldOpen: true,
     dev: false,
+    projectDirExplicit: false,
     command: 'serve',
   }
 
@@ -36,6 +39,7 @@ function parseArgs(argv: string[]): CliOptions {
       options.command = 'self-update'
     } else if (arg === '--dir') {
       options.projectDir = path.resolve(argv[++index] || options.projectDir)
+      options.projectDirExplicit = true
     } else if (arg === '--tickets-dir') {
       options.ticketsDir = argv[++index] || options.ticketsDir
     } else if (arg === '--port') {
@@ -57,6 +61,21 @@ function parseArgs(argv: string[]): CliOptions {
 
 function printHelp(): void {
   console.log(`awb\n\nUsage:\n  awb [--dir PATH] [--tickets-dir DIR] [--port PORT] [--no-open] [--dev] [--editor COMMAND]\n  awb check-for-updates\n  awb self-update\n`)
+}
+
+async function resolveStartupProjectDir(options: CliOptions): Promise<string> {
+  const absoluteTicketsDir = path.resolve(options.projectDir, options.ticketsDir)
+  if (fs.existsSync(absoluteTicketsDir) || options.projectDirExplicit) {
+    return options.projectDir
+  }
+
+  const discovery = await discoverSelectableProjects()
+  const firstProject = discovery.projects[0]
+  if (firstProject) {
+    return firstProject.root
+  }
+
+  return options.projectDir
 }
 
 async function main(): Promise<void> {
@@ -100,6 +119,7 @@ async function main(): Promise<void> {
     return
   }
 
+  options.projectDir = await resolveStartupProjectDir(options)
   const absoluteTicketsDir = path.resolve(options.projectDir, options.ticketsDir)
 
   if (!fs.existsSync(absoluteTicketsDir)) {
