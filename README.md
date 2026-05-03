@@ -54,6 +54,8 @@ Inside any project with a `.tickets/` directory:
 awb
 ```
 
+If the current working directory does not contain `.tickets/`, AWB falls back to the first allowlisted project from the user config when one is configured.
+
 Or point at another project:
 
 ```bash
