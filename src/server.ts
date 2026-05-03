@@ -12,9 +12,11 @@ import type { SelectedTicketContext } from './agent/types.js'
 import { GitWorktreeManager } from './agent/worktree.js'
 import { loadAwbSettings } from './config.js'
 import { loadTickets } from './core/loadTickets.js'
+import { embeddedWebAssets as generatedEmbeddedWebAssets } from './generated/embeddedWebAssets.js'
 import { discoverSelectableProjects } from './projects.js'
 import { ProjectRuntimeManager } from './server/projectRuntime.js'
 import { AgentEventsHub, TicketEventsHub } from './server/sse.js'
+import { decodeEmbeddedWebAsset, type EmbeddedWebAssetsManifest, hasEmbeddedWebAssets, resolveEmbeddedWebAsset } from './webAssets.js'
 
 export type StartServerOptions = {
   projectDir: string
@@ -24,6 +26,7 @@ export type StartServerOptions = {
   editorCommand?: string
   worktreeIsolationEnabled?: boolean
   projectDiscoveryConfigDir?: string
+  embeddedWebAssets?: EmbeddedWebAssetsManifest
 }
 
 export async function startServer(options: StartServerOptions): Promise<{ server: Server; url: string }> {
@@ -32,6 +35,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
 
   const currentDir = path.dirname(fileURLToPath(import.meta.url))
   const webDir = path.resolve(currentDir, '../dist/web')
+  const embeddedWebAssets = options.embeddedWebAssets ?? generatedEmbeddedWebAssets
   const ticketEvents = new TicketEventsHub()
   const agentEvents = new AgentEventsHub()
   const authStorage = AuthStorage.create()
@@ -338,6 +342,16 @@ export async function startServer(options: StartServerOptions): Promise<{ server
         vite.ssrFixStacktrace(error as Error)
         next(error)
       }
+    })
+  } else if (hasEmbeddedWebAssets(embeddedWebAssets)) {
+    app.get('/{*splat}', (request, response) => {
+      const asset = resolveEmbeddedWebAsset(embeddedWebAssets, request.path)
+      if (!asset) {
+        response.status(404).end()
+        return
+      }
+
+      response.status(200).type(asset.contentType).send(decodeEmbeddedWebAsset(asset))
     })
   } else {
     app.use(express.static(webDir))

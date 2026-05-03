@@ -48,6 +48,11 @@ async function run(command: string, args: string[], options: Parameters<typeof s
   })
 }
 
+function canExecuteCompiledArtifact(targetPlatform: string, targetArch: string): boolean {
+  const hostPlatform = process.platform === 'win32' ? 'windows' : process.platform
+  return hostPlatform === targetPlatform && process.arch === targetArch
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const packageJson = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'))
@@ -85,6 +90,14 @@ async function main() {
     ),
   )
   await fs.copyFile(path.join(rootDir, 'package.json'), path.join(packageSupportDir, 'package.json'))
+
+  if (canExecuteCompiledArtifact(options.platform, options.arch)) {
+    await run('bun', ['scripts/release-smoke-test.ts', `--executable=${executablePath}`], {
+      cwd: rootDir,
+    })
+  } else {
+    console.log(`Skipping smoke test for non-native target ${options.platform}-${options.arch} on ${process.platform}-${process.arch}.`)
+  }
 
   await fs.rm(archivePath, { force: true })
 

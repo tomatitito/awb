@@ -9,7 +9,7 @@
   },
   "scripts": {
     "postinstall": "bun scripts/fix-vite-esbuild.ts",
-    "build": "vite build && tsc -p tsconfig.json",
+    "build": "vite build && bun scripts/generate-embedded-web-assets.ts && tsc -p tsconfig.json",
     "build:web": "vite build",
     "build:node": "tsc -p tsconfig.json",
     "check": "biome check src/ tests/",
