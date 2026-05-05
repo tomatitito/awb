@@ -65,10 +65,8 @@ async function main() {
   const archiveName = `awb-v${version}-${options.platform}-${options.arch}.${options.archive}`
   const archivePath = path.join(releaseDir, archiveName)
 
-  const packageSupportDir = path.join(stageDir, 'pi-package')
-
   await fs.rm(stageDir, { recursive: true, force: true })
-  await fs.mkdir(packageSupportDir, { recursive: true })
+  await fs.mkdir(stageDir, { recursive: true })
   await fs.mkdir(releaseDir, { recursive: true })
 
   await run('bun', ['run', 'build'], {
@@ -89,7 +87,6 @@ async function main() {
       2,
     ),
   )
-  await fs.copyFile(path.join(rootDir, 'package.json'), path.join(packageSupportDir, 'package.json'))
 
   if (canExecuteCompiledArtifact(options.platform, options.arch)) {
     await run('bun', ['scripts/release-smoke-test.ts', `--executable=${executablePath}`], {
@@ -102,14 +99,14 @@ async function main() {
   await fs.rm(archivePath, { force: true })
 
   if (options.archive === 'tar.gz') {
-    await run('tar', ['-czf', archivePath, '-C', stageDir, executableName, 'awb-install.json', 'pi-package'], { cwd: rootDir })
+    await run('tar', ['-czf', archivePath, '-C', stageDir, executableName, 'awb-install.json'], { cwd: rootDir })
   } else if (options.archive === 'zip') {
     await run(
       'powershell',
       [
         '-NoProfile',
         '-Command',
-        `Compress-Archive -Path '${executablePath.replace(/'/g, "''")}', '${path.join(stageDir, 'awb-install.json').replace(/'/g, "''")}', '${packageSupportDir.replace(/'/g, "''")}' -DestinationPath '${archivePath.replace(/'/g, "''")}' -Force`,
+        `Compress-Archive -Path '${executablePath.replace(/'/g, "''")}', '${path.join(stageDir, 'awb-install.json').replace(/'/g, "''")}' -DestinationPath '${archivePath.replace(/'/g, "''")}' -Force`,
       ],
       { cwd: rootDir },
     )

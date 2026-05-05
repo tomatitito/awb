@@ -27,19 +27,6 @@ case "$os" in
   *) fail "unsupported platform: $os" ;;
 esac
 
-case "$platform" in
-  darwin)
-    if [ -n "${XDG_CONFIG_HOME:-}" ]; then
-      config_dir="$XDG_CONFIG_HOME/awb"
-    else
-      config_dir="$HOME/Library/Application Support/awb"
-    fi
-    ;;
-  linux) config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/awb" ;;
-  *) fail "unsupported platform: $platform" ;;
-esac
-package_dir="$config_dir/pi-package"
-
 machine=$(uname -m | tr '[:upper:]' '[:lower:]')
 case "$machine" in
   x86_64|amd64) arch="x64" ;;
@@ -57,7 +44,7 @@ tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM
 
 log "Installing awb $tag for $platform-$arch into $install_dir"
-mkdir -p "$install_dir" "$package_dir"
+mkdir -p "$install_dir"
 
 curl -fsSL "$base_url/$asset" -o "$tmp_dir/$asset"
 
@@ -83,15 +70,11 @@ tar -xzf "$tmp_dir/$asset" -C "$extract_dir"
 
 [ -f "$extract_dir/awb" ] || fail "release archive did not contain awb"
 [ -f "$extract_dir/awb-install.json" ] || fail "release archive did not contain awb-install.json"
-[ -f "$extract_dir/pi-package/package.json" ] || fail "release archive did not contain pi-package/package.json"
-
 cp "$extract_dir/awb" "$install_dir/awb"
 chmod +x "$install_dir/awb"
 cp "$extract_dir/awb-install.json" "$install_dir/awb-install.json"
-cp "$extract_dir/pi-package/package.json" "$package_dir/package.json"
 
 log "Installed: $install_dir/awb"
-log "Installed runtime package metadata: $package_dir/package.json"
 case ":$PATH:" in
   *":$install_dir:"*) ;;
   *) log "Note: $install_dir is not on your PATH" ;;

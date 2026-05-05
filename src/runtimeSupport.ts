@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { getAwbUserConfigDir } from './projects.js'
 
@@ -17,15 +16,4 @@ export function resolveAwbPackageDir(options: { platform?: NodeJS.Platform; env?
   if (explicitPiDir) return explicitPiDir
 
   return getAwbPiPackageDir(options)
-}
-
-export function resolveAwbPackageJsonPath(): string | undefined {
-  const candidates = [process.env[AWB_PACKAGE_DIR_ENV]?.trim(), process.env.PI_PACKAGE_DIR?.trim()].filter((value): value is string => Boolean(value))
-
-  for (const directoryPath of candidates) {
-    const packageJsonPath = path.join(directoryPath, 'package.json')
-    if (existsSync(packageJsonPath)) return packageJsonPath
-  }
-
-  return undefined
 }

@@ -138,8 +138,6 @@ describe('selfUpdateAwb', () => {
       },
       extractArchive: async (_archivePath, destinationDir) => {
         await fs.writeFile(path.join(destinationDir, 'awb'), 'new-version')
-        await fs.mkdir(path.join(destinationDir, 'pi-package'), { recursive: true })
-        await fs.writeFile(path.join(destinationDir, 'pi-package', 'package.json'), '{"name":"awb"}')
       },
     })
 

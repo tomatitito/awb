@@ -1,6 +1,6 @@
 {
   "name": "awb",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Agentic workbench built on the tk-style ticket viewer UI",
   "type": "module",
   "packageManager": "bun@1.2.18",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "postinstall": "bun scripts/fix-vite-esbuild.ts",
-    "build": "vite build && bun scripts/generate-embedded-web-assets.ts && tsc -p tsconfig.json",
+    "build": "bun scripts/generate-version.ts && vite build && bun scripts/generate-embedded-web-assets.ts && tsc -p tsconfig.json",
     "build:web": "vite build",
     "build:node": "tsc -p tsconfig.json",
     "check": "biome check src/ tests/",

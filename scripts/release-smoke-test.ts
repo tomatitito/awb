@@ -5,7 +5,6 @@ import { createServer } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { verifyBrowserEntrypoint, waitForServerReady } from '../src/releaseSmoke.js'
-import { AWB_PACKAGE_DIR_ENV } from '../src/runtimeSupport.js'
 
 type SmokeTestOptions = {
   executablePath: string
@@ -78,14 +77,8 @@ async function main() {
   await withTempProject(options.projectDir, options.ticketsDir, async (projectDir) => {
     const port = await findFreePort()
     const baseUrl = `http://127.0.0.1:${port}`
-    const packageDir = path.join(path.dirname(options.executablePath), 'pi-package')
     const child = spawn(options.executablePath, ['--dir', projectDir, '--tickets-dir', options.ticketsDir, '--port', String(port), '--no-open'], {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        [AWB_PACKAGE_DIR_ENV]: packageDir,
-        PI_PACKAGE_DIR: packageDir,
-      },
     })
 
     const exitPromise = new Promise<void>((resolve, reject) => {
