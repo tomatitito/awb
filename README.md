@@ -16,7 +16,7 @@ The intended next step for `awb` is to add an agent panel and execution flow so 
 Install the latest release into `~/.local/bin`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tomatitito/awb/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tomatitito/awb/refs/heads/main/install.sh | sh
 ```
 
 The installer detects macOS/Linux and x64/ARM64, downloads the matching latest GitHub release asset, verifies its checksum when available, and installs the self-contained `awb` binary into `~/.local/bin`.
