@@ -48,7 +48,7 @@ mkdir -p "$install_dir"
 
 curl -fsSL "$base_url/$asset" -o "$tmp_dir/$asset"
 
-checksums="awb-${tag#v}-checksums.txt"
+checksums="awb-${tag}-checksums.txt"
 if curl -fsSL "$base_url/$checksums" -o "$tmp_dir/$checksums"; then
   expected=$(grep " $asset\$" "$tmp_dir/$checksums" | awk '{print $1}')
   if [ -n "$expected" ]; then
