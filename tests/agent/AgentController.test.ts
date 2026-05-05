@@ -22,8 +22,9 @@ const stubModelRegistry = {
   hasConfiguredAuth: () => false,
 } as unknown as ModelRegistry
 
-function makeTicket(overrides: Partial<TicketRunContext> & { ticketId: string }): TicketRunContext {
+function makeTicket(overrides: Partial<Omit<TicketRunContext, 'kind'>> & { ticketId: string }): TicketRunContext {
   return {
+    kind: 'ticket',
     ticketId: overrides.ticketId,
     title: overrides.title ?? overrides.ticketId,
     body: overrides.body ?? '',
@@ -131,8 +132,8 @@ describe('AgentController', () => {
     await Promise.resolve()
 
     expect(controller.listRuns().map((run) => run.id)).toEqual(['run-2', 'run-1'])
-    expect(controller.getRun(firstRun.id)?.ticket).toEqual(firstTicket)
-    expect(controller.getRun(secondRun.id)?.ticket).toEqual(secondTicket)
+    expect(controller.getRun(firstRun.id)?.context).toEqual(firstTicket)
+    expect(controller.getRun(secondRun.id)?.context).toEqual(secondTicket)
     expect(controller.getRun(firstRun.id)?.worktree).toEqual({
       mode: 'shared-project',
       status: 'not-requested',
@@ -150,6 +151,42 @@ describe('AgentController', () => {
 
     expect(secondSession.promptCalls[0]).toContain('Ticket ID: awb-2')
     expect(secondSession.promptCalls[0]).toContain('Implement the second task.')
+  })
+
+  test('creates unticketed runs from the first user prompt without injecting a ticket prompt', async () => {
+    const mockSession = createMockSession()
+    const now = (() => {
+      let current = 1500
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => ({ session: mockSession.session }),
+      createRunId: () => 'run-chat-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const run = await controller.createUnticketedRun('Help me refine the roadmap and create a new ticket.')
+    await Promise.resolve()
+
+    expect(run.context).toEqual({
+      kind: 'unticketed',
+      title: 'Help me refine the roadmap and create a new ticket.',
+    })
+    expect(run.transcript.initialPrompt).toBe('Help me refine the roadmap and create a new ticket.')
+    expect(run.transcript.entries).toEqual([
+      {
+        id: 'run-chat-1:user:initial',
+        role: 'user',
+        text: 'Help me refine the roadmap and create a new ticket.',
+        timestamp: 1501,
+      },
+    ])
+    expect(mockSession.promptCalls).toEqual(['Help me refine the roadmap and create a new ticket.'])
+    expect(mockSession.promptCalls[0]).not.toContain('Use red/green TDD to implement this ticket.')
+    expect(mockSession.promptCalls[0]).not.toContain('Ticket ID:')
   })
 
   test('records transcript and tool activity on a specific run', async () => {

@@ -1,13 +1,26 @@
 export type AgentPanelStatus = 'idle' | 'connecting' | 'ready' | 'running' | 'error'
 
 export type TicketRunContext = {
+  kind: 'ticket'
   ticketId: string
   title: string
   body: string
   filePath: string
 }
 
-export type SelectedTicketContext = TicketRunContext
+export type UnticketedRunContext = {
+  kind: 'unticketed'
+  title: string
+}
+
+export type AgentRunContext = TicketRunContext | UnticketedRunContext
+
+export type SelectedTicketContext = {
+  ticketId: string
+  title: string
+  body: string
+  filePath: string
+}
 
 export type AgentRunStatus = 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'aborted'
 
@@ -54,7 +67,7 @@ export type AgentRunWorktreeState = {
 
 export type AgentRunState = {
   id: string
-  ticket: TicketRunContext
+  context: AgentRunContext
   status: AgentRunStatus
   createdAt: number
   startedAt?: number

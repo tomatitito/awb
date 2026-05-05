@@ -48,6 +48,12 @@ export async function createAgentRun(ticketId: string): Promise<AgentRunState> {
   return payload.run
 }
 
+export async function createUnticketedAgentRun(text: string): Promise<AgentRunState> {
+  const response = await postJson('/api/agent/runs/chat', { text })
+  const payload = (await response.json()) as { run: AgentRunState }
+  return payload.run
+}
+
 export async function sendAgentPrompt(text: string): Promise<void> {
   await postJson('/api/agent/prompt', { text })
 }

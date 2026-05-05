@@ -903,6 +903,14 @@ function formatAgentRunStatus(status: AgentRunState['status']): string {
   return status.replace(/-/g, ' ')
 }
 
+export function getAgentRunContextLabel(run: AgentRunState): string {
+  return run.context.kind === 'ticket' ? run.context.ticketId : 'Unticketed agent chat'
+}
+
+export function getAgentRunTitle(run: AgentRunState): string {
+  return run.context.title
+}
+
 function isActiveAgentRun(run: AgentRunState): boolean {
   return run.status === 'queued' || run.status === 'starting' || run.status === 'running'
 }
@@ -950,8 +958,13 @@ function AgentRunDetail({
   onBack?: () => void
   showBack: boolean
 }) {
-  const [promptText, setPromptText] = useState('Continue implementing the ticket and report progress.')
+  const [promptText, setPromptText] = useState('')
   const [actionError, setActionError] = useState<string | undefined>()
+
+  useEffect(() => {
+    setPromptText(run?.context.kind === 'ticket' ? 'Continue implementing the ticket and report progress.' : '')
+    setActionError(undefined)
+  }, [run])
 
   if (!run) {
     return <div className="empty-state agents-detail-empty-state">Select a run to inspect its transcript and tool activity.</div>
@@ -972,9 +985,7 @@ function AgentRunDetail({
                 Back
               </button>
             ) : null}
-            <strong>
-              {run.ticket.ticketId} — {run.ticket.title}
-            </strong>
+            <strong>{getAgentRunTitle(run)}</strong>
           </div>
           <div className="agent-panel-subtitle">
             Run {run.id.slice(0, 12)} · started {formatAgentRunStartedAt(run)}
@@ -984,6 +995,10 @@ function AgentRunDetail({
       </div>
 
       <div className="agent-panel-section-grid">
+        <div>
+          <strong>Context</strong>
+          <span>{getAgentRunContextLabel(run)}</span>
+        </div>
         <div>
           <strong>Model</strong>
           <span>{run.model ? `${run.model.provider}/${run.model.id}` : '—'}</span>
@@ -1135,6 +1150,7 @@ export function AgentsView({
   onSelectRun,
   onBack,
   onSendPrompt,
+  onCreateUnticketedRun,
   onAbortRun,
   onOpenWorktree,
   onCleanupWorktree,
@@ -1145,15 +1161,16 @@ export function AgentsView({
   onSelectRun: (runId: string) => void
   onBack: () => void
   onSendPrompt: (runId: string, text: string) => Promise<void>
+  onCreateUnticketedRun: (text: string) => Promise<AgentRunState>
   onAbortRun: (runId: string) => Promise<void>
   onOpenWorktree: (runId: string) => Promise<void>
   onCleanupWorktree: (runId: string) => Promise<void>
   viewportMode: ViewportMode
 }) {
-  if (runs.length === 0) {
-    return <div className="empty-state agents-empty-state">No agent runs yet. Start a run from a ready ticket to see it here.</div>
-  }
-
+  const [isComposerOpen, setIsComposerOpen] = useState(runs.length === 0)
+  const [firstMessage, setFirstMessage] = useState('')
+  const [createError, setCreateError] = useState<string | undefined>()
+  const [isCreatingRun, setIsCreatingRun] = useState(false)
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0]
   const isMobile = viewportMode === 'mobile'
   const showDetailOnly = isMobile && Boolean(selectedRunId)
@@ -1165,11 +1182,68 @@ export function AgentsView({
           <h2>Agents</h2>
           <p>Active runs appear first. Within each group, runs are ordered by started time, most recent first.</p>
         </div>
-        <span className="badge">{runs.length} total</span>
+        <div className="agents-view-header-actions">
+          <button
+            type="button"
+            className="primary-button"
+            data-awb="new-agent-chat"
+            onClick={() => {
+              setCreateError(undefined)
+              setIsComposerOpen((current) => !current)
+            }}
+          >
+            New agent chat
+          </button>
+          <span className="badge">{runs.length} total</span>
+        </div>
       </header>
+      {isComposerOpen ? (
+        <form
+          className="agents-create-run-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const text = firstMessage.trim()
+            if (!text || isCreatingRun) return
+            setCreateError(undefined)
+            setIsCreatingRun(true)
+            void onCreateUnticketedRun(text)
+              .then((run) => {
+                setFirstMessage('')
+                setIsComposerOpen(false)
+                onSelectRun(run.id)
+              })
+              .catch((error) => {
+                setCreateError(error instanceof Error ? error.message : String(error))
+              })
+              .finally(() => {
+                setIsCreatingRun(false)
+              })
+          }}
+        >
+          <strong>Start a new unticketed agent conversation</strong>
+          <textarea value={firstMessage} onChange={(event) => setFirstMessage(event.target.value)} placeholder="Describe what you want to refine, explore, or create" rows={4} />
+          {createError ? <div className="agent-panel-error">{createError}</div> : null}
+          <div className="agent-run-controls">
+            <button type="submit" className="primary-button" disabled={isCreatingRun || !firstMessage.trim()}>
+              {isCreatingRun ? 'Starting…' : 'Start chat'}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setCreateError(undefined)
+                setIsComposerOpen(false)
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : null}
       <div className={`agents-layout ${isMobile ? 'mobile' : 'desktop'}`}>
         {!showDetailOnly ? (
           <ul className="agents-run-list" aria-label="Agent runs">
+            {runs.length === 0 ? <li className="empty-state agents-empty-state">No agent runs yet.</li> : null}
             {runs.map((run) => (
               <li key={run.id}>
                 <button type="button" className={`agents-run-row ${selectedRun?.id === run.id ? 'selected' : ''}`} onClick={() => onSelectRun(run.id)}>
@@ -1179,8 +1253,8 @@ export function AgentsView({
                     </span>
                     <span className="agents-run-started-at">{formatAgentRunStartedAt(run)}</span>
                   </div>
-                  <div className="agents-run-ticket-id">{run.ticket.ticketId}</div>
-                  <div className="agents-run-ticket-title">{run.ticket.title}</div>
+                  <div className="agents-run-ticket-id">{getAgentRunContextLabel(run)}</div>
+                  <div className="agents-run-ticket-title">{getAgentRunTitle(run)}</div>
                 </button>
               </li>
             ))}

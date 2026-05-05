@@ -14,6 +14,7 @@ import type {
   AgentToolActivityEntry,
   SelectedTicketContext,
   TicketRunContext,
+  UnticketedRunContext,
 } from './types.js'
 
 type SessionFactory = typeof createPiSession
@@ -98,7 +99,7 @@ export class AgentController {
       sessionId: latestRun.sessionId,
       sessionFile: latestRun.sessionFile,
       model: latestRun.model,
-      selectedTicketId: this.selectedTicket?.ticketId ?? latestRun.ticket.ticketId,
+      selectedTicketId: this.selectedTicket?.ticketId ?? (latestRun.context.kind === 'ticket' ? latestRun.context.ticketId : undefined),
       lastError: latestRun.lastError,
       isStreaming: latestRun.status === 'running' || latestRun.status === 'starting',
       queuedSteeringCount: latestRun.queuedSteeringCount,
@@ -147,13 +148,20 @@ export class AgentController {
     this.selectedTicket = ticket
   }
 
-  async createRun(ticket: TicketRunContext): Promise<AgentRunState> {
+  async createRun(ticket: SelectedTicketContext): Promise<AgentRunState> {
     const runId = this.createRunId()
     const createdAt = this.now()
-    const initialPrompt = this.buildInitialPrompt(ticket)
+    const context: TicketRunContext = {
+      kind: 'ticket',
+      ticketId: ticket.ticketId,
+      title: ticket.title,
+      body: ticket.body,
+      filePath: ticket.filePath,
+    }
+    const initialPrompt = this.buildInitialPrompt(context)
     const run: AgentRunState = {
       id: runId,
-      ticket,
+      context,
       status: 'queued',
       createdAt,
       updatedAt: createdAt,
@@ -165,6 +173,56 @@ export class AgentController {
             id: `${runId}:user:initial`,
             role: 'user',
             text: initialPrompt,
+            timestamp: createdAt,
+          },
+        ],
+        toolActivity: [],
+        updatedAt: createdAt,
+      },
+      queuedSteeringCount: 0,
+      queuedFollowUpCount: 0,
+      worktree: this.worktreeManager?.enabled
+        ? {
+            mode: 'git-worktree',
+            status: 'provisioning',
+          }
+        : {
+            mode: 'shared-project',
+            status: 'not-requested',
+          },
+    }
+
+    this.runs.set(runId, { run })
+    this.runOrder = [runId, ...this.runOrder]
+    this.emit({ type: 'run-created', run })
+    void this.startRun(runId)
+    return run
+  }
+
+  async createUnticketedRun(firstPrompt: string): Promise<AgentRunState> {
+    const userText = firstPrompt.trim()
+    if (!userText) throw new Error('Prompt text is required.')
+
+    const runId = this.createRunId()
+    const createdAt = this.now()
+    const context: UnticketedRunContext = {
+      kind: 'unticketed',
+      title: this.buildUnticketedRunTitle(userText),
+    }
+    const run: AgentRunState = {
+      id: runId,
+      context,
+      status: 'queued',
+      createdAt,
+      updatedAt: createdAt,
+      transcript: {
+        runId,
+        initialPrompt: userText,
+        entries: [
+          {
+            id: `${runId}:user:initial`,
+            role: 'user',
+            text: userText,
             timestamp: createdAt,
           },
         ],
@@ -301,6 +359,12 @@ export class AgentController {
       'Ticket Body:',
       ticket.body || '(empty)',
     ].join('\n')
+  }
+
+  private buildUnticketedRunTitle(firstPrompt: string): string {
+    const normalized = firstPrompt.replace(/\s+/g, ' ').trim()
+    if (!normalized) return 'Unticketed agent chat'
+    return normalized.length > 72 ? `${normalized.slice(0, 69)}…` : normalized
   }
 
   private async startRun(runId: string): Promise<void> {
@@ -556,7 +620,7 @@ export function toLegacyPanelEvent(event: AgentRunEvent): AgentPanelEvent | unde
           sessionId: event.run.sessionId,
           sessionFile: event.run.sessionFile,
           model: event.run.model,
-          selectedTicketId: event.run.ticket.ticketId,
+          selectedTicketId: event.run.context.kind === 'ticket' ? event.run.context.ticketId : undefined,
           lastError: event.run.lastError,
           isStreaming: event.run.status === 'running' || event.run.status === 'starting',
           queuedSteeringCount: event.run.queuedSteeringCount,

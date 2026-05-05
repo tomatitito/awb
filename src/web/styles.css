@@ -1496,6 +1496,32 @@ legend.graph-controls-label {
   color: var(--dim);
 }
 
+.agents-view-header-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.agents-create-run-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  background: var(--container-bg);
+}
+
+.agents-create-run-form textarea {
+  width: 100%;
+  min-height: 96px;
+  background: var(--body-bg);
+  color: var(--text);
+  border: 1px solid var(--dim);
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
 .agents-layout.desktop {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);

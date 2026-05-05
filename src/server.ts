@@ -142,6 +142,17 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     response.status(201).json({ run })
   })
 
+  app.post('/api/agent/runs/chat', async (request, response) => {
+    const text = typeof request.body?.text === 'string' ? request.body.text.trim() : ''
+    if (!text) {
+      response.status(400).json({ message: 'Prompt text is required.' })
+      return
+    }
+
+    const run = await runtime.agentController.createUnticketedRun(text)
+    response.status(201).json({ run })
+  })
+
   app.get('/api/agent/runs/events', (_request, response) => {
     agentEvents.addAllRunsClient(response, runtime.agentController.listRuns())
     _request.on('close', () => {

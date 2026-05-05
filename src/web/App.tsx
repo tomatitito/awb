@@ -7,6 +7,7 @@ import {
   abortSpecificAgentRun,
   cleanupAgentRunWorktree,
   createAgentRun,
+  createUnticketedAgentRun,
   fetchAvailableProjects,
   listAgentRuns,
   openAgentRunWorktree,
@@ -172,7 +173,9 @@ export default function App() {
   const activeRunTicketIds = useMemo(() => {
     const ids = new Set<string>()
     for (const run of activeRuns) {
-      ids.add(run.ticket.ticketId)
+      if (run.context.kind === 'ticket') {
+        ids.add(run.context.ticketId)
+      }
     }
     return ids
   }, [activeRuns])
@@ -252,6 +255,22 @@ export default function App() {
     }
   }
 
+  const handleStartUnticketedAgentRun = async (text: string) => {
+    const run = await createUnticketedAgentRun(text)
+    setAgentRuns((current) => {
+      const nextRuns = current.filter((candidate) => candidate.id !== run.id)
+      return [run, ...nextRuns].sort((left, right) => {
+        const leftActive = left.status === 'queued' || left.status === 'starting' || left.status === 'running'
+        const rightActive = right.status === 'queued' || right.status === 'starting' || right.status === 'running'
+        if (leftActive !== rightActive) return leftActive ? -1 : 1
+        return (right.startedAt ?? right.createdAt) - (left.startedAt ?? left.createdAt)
+      })
+    })
+    setSelectedAgentRunId(run.id)
+    setTab('agents')
+    return run
+  }
+
   const handleStartAgentRun = async (ticketId: string) => {
     if (runLockTicketIdsRef.current.has(ticketId)) return
 
@@ -306,6 +325,7 @@ export default function App() {
       onSelectAgentRun={setSelectedAgentRunId}
       onBackToAgentsList={() => setSelectedAgentRunId(undefined)}
       onSendAgentRunPrompt={sendAgentRunPrompt}
+      onCreateUnticketedAgentRun={handleStartUnticketedAgentRun}
       onAbortAgentRun={abortSpecificAgentRun}
       onOpenAgentRunWorktree={openAgentRunWorktree}
       onCleanupAgentRunWorktree={async (runId) => {
