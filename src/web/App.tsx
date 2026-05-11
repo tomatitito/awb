@@ -6,6 +6,7 @@ import type { SelectableProject } from '../projects'
 import {
   abortSpecificAgentRun,
   cleanupAgentRunWorktree,
+  closeUnticketedAgentRun,
   createAgentRun,
   createUnticketedAgentRun,
   fetchAvailableProjects,
@@ -300,6 +301,21 @@ export default function App() {
     }
   }
 
+  const handleCloseUnticketedAgentRun = async (runId: string) => {
+    const run = await closeUnticketedAgentRun(runId)
+    setAgentRuns((current) =>
+      current
+        .map((candidate) => (candidate.id === run.id ? run : candidate))
+        .sort((left, right) => {
+          const leftActive = left.status === 'queued' || left.status === 'starting' || left.status === 'running'
+          const rightActive = right.status === 'queued' || right.status === 'starting' || right.status === 'running'
+          if (leftActive !== rightActive) return leftActive ? -1 : 1
+          return (right.startedAt ?? right.createdAt) - (left.startedAt ?? left.createdAt)
+        }),
+    )
+    return run
+  }
+
   return (
     <ResponsiveWorkspaceLayout
       viewportMode={viewportMode}
@@ -327,6 +343,7 @@ export default function App() {
       onSendAgentRunPrompt={sendAgentRunPrompt}
       onCreateUnticketedAgentRun={handleStartUnticketedAgentRun}
       onAbortAgentRun={abortSpecificAgentRun}
+      onCloseUnticketedAgentRun={handleCloseUnticketedAgentRun}
       onOpenAgentRunWorktree={openAgentRunWorktree}
       onCleanupAgentRunWorktree={async (runId) => {
         const run = await cleanupAgentRunWorktree(runId)

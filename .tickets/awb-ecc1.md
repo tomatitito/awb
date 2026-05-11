@@ -1,6 +1,6 @@
 ---
 id: awb-ecc1
-status: open
+status: closed
 deps: [awb-5jki]
 links: []
 created: 2026-05-11T08:55:33Z

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import type { AgentPanelState, AgentRunState } from '../agent/types'
+import type { AgentPanelState, AgentRunResumeHealth, AgentRunState } from '../agent/types'
 import type { VisibleGraphDerivation } from '../core/graph'
 import type { DerivedTicket } from '../core/types'
 import type { SelectableProject } from '../projects'
@@ -915,7 +915,84 @@ function isActiveAgentRun(run: AgentRunState): boolean {
   return run.status === 'queued' || run.status === 'starting' || run.status === 'running'
 }
 
+function canCloseUnticketedChat(run: AgentRunState): boolean {
+  return run.context.kind === 'unticketed' && run.status !== 'closed' && run.status !== 'failed' && run.status !== 'aborted'
+}
+
+function getCloseUnticketedChatCopy(run: AgentRunState): string {
+  if (hasUnavailableResume(run)) {
+    return 'Close this chat and keep its read-only history.'
+  }
+
+  if (isActiveAgentRun(run)) {
+    return 'Stop the current response and close this chat. History is kept for later resume.'
+  }
+
+  return 'Close this chat and keep its history for later resume.'
+}
+
+function formatAgentRunResumeState(state: AgentRunResumeHealth['state']): string {
+  return state.replace(/-/g, ' ')
+}
+
+function getAgentRunResumeSummary(run: AgentRunState): string | undefined {
+  if (!run.resume) return undefined
+
+  switch (run.resume.state) {
+    case 'available':
+      return 'Resume available'
+    case 'not-started':
+      return 'Resume not started'
+    case 'missing-session-file':
+      return 'Session file missing'
+    case 'invalid-session-file':
+      return 'Session file invalid'
+    case 'cwd-mismatch':
+      return 'Session cwd mismatch'
+    case 'worktree-missing':
+      return 'Worktree missing'
+    case 'worktree-cleaned':
+      return 'Worktree cleaned'
+  }
+}
+
+function getAgentRunResumeCopy(run: AgentRunState): string | undefined {
+  if (!run.resume) return undefined
+
+  switch (run.resume.state) {
+    case 'available':
+      return 'This persisted conversation can be reopened by sending a follow-up prompt.'
+    case 'not-started':
+      return 'This run never created a pi session file, so the persisted conversation cannot be resumed.'
+    case 'missing-session-file':
+      return 'The recorded pi session file is missing. The transcript is still available, but follow-up prompts are disabled.'
+    case 'invalid-session-file':
+      return 'The recorded pi session file could not be opened. The transcript is still available, but follow-up prompts are disabled.'
+    case 'cwd-mismatch':
+      return 'The recorded session cwd does not match this run cwd. Follow-up prompts are disabled to avoid resuming in the wrong checkout.'
+    case 'worktree-missing':
+      return 'The retained worktree for this run is missing. The transcript is still available, but follow-up prompts are disabled.'
+    case 'worktree-cleaned':
+      return 'The retained worktree for this run was cleaned. The transcript is still available, but follow-up prompts are disabled.'
+  }
+}
+
+function getAgentRunResumeError(run: AgentRunState): string | undefined {
+  return run.resume?.error || undefined
+}
+
+function hasUnavailableResume(run: AgentRunState): boolean {
+  return Boolean(run.resume && run.resume.state !== 'available')
+}
+
 function getReadOnlyRunCopy(run: AgentRunState): string {
+  const resumeCopy = getAgentRunResumeCopy(run)
+  if (hasUnavailableResume(run) && resumeCopy) return resumeCopy
+
+  if (run.context.kind === 'unticketed' && run.status === 'closed') {
+    return 'This chat is closed and read-only. Its history is kept for later resume.'
+  }
+
   if (run.status === 'failed') {
     return 'This run failed and is read-only. Start a new agent chat or run the ticket again to continue from a fresh agent session.'
   }
@@ -957,6 +1034,7 @@ function AgentRunDetail({
   run,
   onSendPrompt,
   onAbortRun,
+  onCloseUnticketedRun,
   onOpenWorktree,
   onCleanupWorktree,
   onBack,
@@ -965,6 +1043,7 @@ function AgentRunDetail({
   run?: AgentRunState
   onSendPrompt: (runId: string, text: string) => Promise<void>
   onAbortRun: (runId: string) => Promise<void>
+  onCloseUnticketedRun: (runId: string) => Promise<AgentRunState>
   onOpenWorktree: (runId: string) => Promise<void>
   onCleanupWorktree: (runId: string) => Promise<void>
   onBack?: () => void
@@ -972,11 +1051,15 @@ function AgentRunDetail({
 }) {
   const [promptText, setPromptText] = useState('')
   const [actionError, setActionError] = useState<string | undefined>()
+  const [closeError, setCloseError] = useState<string | undefined>()
+  const [isClosingChat, setIsClosingChat] = useState(false)
   const [composerError, setComposerError] = useState<string | undefined>()
 
   useEffect(() => {
     setPromptText(run?.context.kind === 'ticket' ? 'Continue implementing the ticket and report progress.' : '')
     setActionError(undefined)
+    setCloseError(undefined)
+    setIsClosingChat(false)
     setComposerError(undefined)
   }, [run])
 
@@ -987,10 +1070,14 @@ function AgentRunDetail({
   const active = isActiveAgentRun(run)
   const canContinue = run.status === 'completed'
   const waitingForPrompt = run.status === 'waiting'
-  const canPrompt = active || canContinue || waitingForPrompt
+  const resumeUnavailable = hasUnavailableResume(run)
+  const canPrompt = active || ((canContinue || waitingForPrompt) && !resumeUnavailable)
+  const showCloseChat = canCloseUnticketedChat(run)
   const transcript = run.transcript.entries
   const toolActivity = [...run.transcript.toolActivity].slice(-12).reverse()
   const hasRetainedWorktree = run.worktree?.mode === 'git-worktree' && run.worktree.status === 'ready' && Boolean(run.worktree.path)
+  const resumeCopy = getAgentRunResumeCopy(run)
+  const resumeError = getAgentRunResumeError(run)
 
   return (
     <section className="agent-run-detail" data-awb="agent-run-detail">
@@ -1029,6 +1116,53 @@ function AgentRunDetail({
           <span>{run.queuedSteeringCount + run.queuedFollowUpCount}</span>
         </div>
       </div>
+
+      {run.resume ? (
+        <section className="agent-panel-section">
+          <strong>Resume</strong>
+          <div className="agent-panel-section-grid">
+            <div>
+              <strong>State</strong>
+              <span>{formatAgentRunResumeState(run.resume.state)}</span>
+            </div>
+            <div>
+              <strong>Last checked</strong>
+              <span>{formatAgentRunEntryTime(run.resume.lastCheckedAt)}</span>
+            </div>
+          </div>
+          {resumeCopy ? <div className="agent-panel-copy">{resumeCopy}</div> : null}
+          {resumeError ? <div className="agent-panel-error">{resumeError}</div> : null}
+        </section>
+      ) : null}
+
+      {showCloseChat ? (
+        <section className="agent-panel-section">
+          <strong>Chat controls</strong>
+          <div className="agent-panel-copy">{getCloseUnticketedChatCopy(run)}</div>
+          {closeError ? <div className="agent-panel-error">{closeError}</div> : null}
+          <div className="agent-run-controls">
+            <button
+              type="button"
+              className="secondary-button"
+              data-awb="close-unticketed-chat"
+              disabled={isClosingChat}
+              onClick={() => {
+                setCloseError(undefined)
+                setIsClosingChat(true)
+                void onCloseUnticketedRun(run.id)
+                  .catch((error) => {
+                    setCloseError(error instanceof Error ? error.message : String(error))
+                  })
+                  .finally(() => {
+                    setIsClosingChat(false)
+                  })
+              }}
+            >
+              {isClosingChat ? 'Closing…' : 'Close chat'}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="agent-panel-section">
         <strong>Worktree</strong>
@@ -1130,7 +1264,7 @@ function AgentRunDetail({
           }}
         >
           <strong>{canContinue ? 'Continue / resume conversation' : 'Follow-up prompt'}</strong>
-          {canContinue ? <div className="agent-panel-copy">Send a follow-up prompt to continue this completed conversation.</div> : null}
+          {canContinue ? <div className="agent-panel-copy">{resumeCopy ?? 'Send a follow-up prompt to continue this completed conversation.'}</div> : null}
           <textarea
             value={promptText}
             onChange={(event) => setPromptText(event.target.value)}
@@ -1146,7 +1280,9 @@ function AgentRunDetail({
               <button
                 type="button"
                 className="secondary-button"
+                data-awb="stop-agent-run"
                 disabled={run.status === 'queued' || run.status === 'starting'}
+                title={showCloseChat ? 'Stop only the current response. Use Close chat to end the chat.' : undefined}
                 onClick={() => {
                   setActionError(undefined)
                   void onAbortRun(run.id).catch((error) => {
@@ -1163,6 +1299,7 @@ function AgentRunDetail({
         <section className="agent-panel-section">
           <strong>Run state</strong>
           <div className="agent-panel-copy">{getReadOnlyRunCopy(run)}</div>
+          {resumeError ? <div className="agent-panel-error">{resumeError}</div> : null}
           {run.lastError ? <div className="agent-panel-error">{run.lastError}</div> : null}
         </section>
       )}
@@ -1178,6 +1315,7 @@ export function AgentsView({
   onSendPrompt,
   onCreateUnticketedRun,
   onAbortRun,
+  onCloseUnticketedRun,
   onOpenWorktree,
   onCleanupWorktree,
   viewportMode,
@@ -1189,6 +1327,7 @@ export function AgentsView({
   onSendPrompt: (runId: string, text: string) => Promise<void>
   onCreateUnticketedRun: (text: string) => Promise<AgentRunState>
   onAbortRun: (runId: string) => Promise<void>
+  onCloseUnticketedRun: (runId: string) => Promise<AgentRunState>
   onOpenWorktree: (runId: string) => Promise<void>
   onCleanupWorktree: (runId: string) => Promise<void>
   viewportMode: ViewportMode
@@ -1281,6 +1420,7 @@ export function AgentsView({
                   </div>
                   <div className="agents-run-ticket-id">{getAgentRunContextLabel(run)}</div>
                   <div className="agents-run-ticket-title">{getAgentRunTitle(run)}</div>
+                  {run.resume ? <div className={`agents-run-resume-state resume-${run.resume.state}`}>{getAgentRunResumeSummary(run)}</div> : null}
                 </button>
               </li>
             ))}
@@ -1291,6 +1431,7 @@ export function AgentsView({
             run={selectedRun}
             onSendPrompt={onSendPrompt}
             onAbortRun={onAbortRun}
+            onCloseUnticketedRun={onCloseUnticketedRun}
             onOpenWorktree={onOpenWorktree}
             onCleanupWorktree={onCleanupWorktree}
             onBack={onBack}

@@ -1589,6 +1589,20 @@ legend.graph-controls-label {
   font-weight: 700;
 }
 
+.agents-run-resume-state {
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.agents-run-resume-state.resume-available {
+  color: var(--success);
+}
+
+.agents-run-resume-state:not(.resume-available) {
+  color: var(--warning);
+}
+
 .agent-run-detail {
   display: grid;
   gap: 14px;

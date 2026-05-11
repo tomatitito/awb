@@ -45,6 +45,7 @@ export type WorkspaceLayoutProps = {
   onSendAgentRunPrompt: (runId: string, text: string) => Promise<void>
   onCreateUnticketedAgentRun: (text: string) => Promise<AgentRunState>
   onAbortAgentRun: (runId: string) => Promise<void>
+  onCloseUnticketedAgentRun: (runId: string) => Promise<AgentRunState>
   onOpenAgentRunWorktree: (runId: string) => Promise<void>
   onCleanupAgentRunWorktree: (runId: string) => Promise<void>
   selectedId?: string
@@ -288,6 +289,7 @@ function DesktopWorkspaceLayout(props: WorkspaceLayoutProps) {
               onSendPrompt={props.onSendAgentRunPrompt}
               onCreateUnticketedRun={props.onCreateUnticketedAgentRun}
               onAbortRun={props.onAbortAgentRun}
+              onCloseUnticketedRun={props.onCloseUnticketedAgentRun}
               onOpenWorktree={props.onOpenAgentRunWorktree}
               onCleanupWorktree={props.onCleanupAgentRunWorktree}
               viewportMode={props.viewportMode}
@@ -384,6 +386,7 @@ function TabletWorkspaceLayout(props: WorkspaceLayoutProps) {
               onSendPrompt={props.onSendAgentRunPrompt}
               onCreateUnticketedRun={props.onCreateUnticketedAgentRun}
               onAbortRun={props.onAbortAgentRun}
+              onCloseUnticketedRun={props.onCloseUnticketedAgentRun}
               onOpenWorktree={props.onOpenAgentRunWorktree}
               onCleanupWorktree={props.onCleanupAgentRunWorktree}
               viewportMode={props.viewportMode}
@@ -471,6 +474,7 @@ function MobileWorkspaceLayout(props: WorkspaceLayoutProps) {
               onSendPrompt={props.onSendAgentRunPrompt}
               onCreateUnticketedRun={props.onCreateUnticketedAgentRun}
               onAbortRun={props.onAbortAgentRun}
+              onCloseUnticketedRun={props.onCloseUnticketedAgentRun}
               onOpenWorktree={props.onOpenAgentRunWorktree}
               onCleanupWorktree={props.onCleanupAgentRunWorktree}
               viewportMode={props.viewportMode}
