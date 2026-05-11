@@ -21,6 +21,7 @@ export async function createPiSession(
   projectDir: string,
   options: {
     cwd?: string
+    sessionFile?: string
     credentialProvider?: CredentialProvider
     modelRegistry?: ModelRegistry
     model?: Model<Api>
@@ -46,7 +47,7 @@ export async function createPiSession(
     modelRegistry,
     model: options.model,
     resourceLoader,
-    sessionManager: SessionManager.continueRecent(cwd, awbSessionDir),
+    sessionManager: options.sessionFile ? SessionManager.open(options.sessionFile, awbSessionDir, cwd) : SessionManager.continueRecent(cwd, awbSessionDir),
   })
 
   return {

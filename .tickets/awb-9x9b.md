@@ -1,6 +1,6 @@
 ---
 id: awb-9x9b
-status: open
+status: closed
 deps: [awb-vf2e, awb-s0fx]
 links: []
 created: 2026-05-11T08:51:52Z

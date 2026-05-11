@@ -571,7 +571,7 @@ describe('AgentController', () => {
     expect(closed.abortedAt).toBeUndefined()
     expect(mockSession.abortCalls).toBe(0)
     expect(mockSession.disposeCalls).toBe(1)
-    await expect(controller.promptRun(run.id, 'Are you still there?')).rejects.toThrow('has been closed')
+    await expect(controller.promptRun(run.id, 'Are you still there?')).rejects.toThrow('Session file /tmp/session-1.jsonl does not exist.')
   })
 
   test('closing a running unticketed chat aborts the active response before closing', async () => {

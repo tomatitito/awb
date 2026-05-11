@@ -147,6 +147,12 @@ export class AgentRunStorage {
     if (!fs.existsSync(run.sessionFile)) {
       return { state: 'missing-session-file', lastCheckedAt: checkedAt, error: `Session file ${run.sessionFile} does not exist.` }
     }
+    if (run.resume?.state === 'invalid-session-file' || run.resume?.state === 'cwd-mismatch') {
+      return {
+        ...run.resume,
+        lastCheckedAt: checkedAt,
+      }
+    }
     return { state: 'available', lastCheckedAt: checkedAt, error: null }
   }
 

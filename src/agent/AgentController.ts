@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import type { AssistantMessage } from '@mariozechner/pi-ai'
 import type { AgentSession, AgentSessionEvent, ModelRegistry } from '@mariozechner/pi-coding-agent'
 import { openPathInEditor } from '../editor.js'
@@ -10,6 +11,7 @@ import type {
   AgentPanelEvent,
   AgentPanelState,
   AgentRunEvent,
+  AgentRunResumeHealth,
   AgentRunState,
   AgentRunWorktreeState,
   AgentToolActivityEntry,
@@ -276,8 +278,12 @@ export class AgentController {
     const record = this.requireRun(runId)
     if (record.run.status === 'failed') throw new Error(`Run ${runId} has failed and cannot accept follow-up prompts.`)
     if (record.run.status === 'aborted') throw new Error(`Run ${runId} has been aborted and cannot accept follow-up prompts.`)
-    if (record.run.status === 'closed') throw new Error(`Run ${runId} has been closed and cannot accept follow-up prompts.`)
-    if (!record.session) throw new Error(`Run ${runId} is not ready for follow-up prompts yet.`)
+    if (!record.session && (record.run.status === 'queued' || record.run.status === 'starting' || record.run.status === 'running')) {
+      throw new Error(`Run ${runId} is not ready for follow-up prompts yet.`)
+    }
+    if (!record.session) await this.reopenRunSession(record)
+    const session = record.session
+    if (!session) throw new Error(`Run ${runId} is not ready for follow-up prompts yet.`)
 
     const timestamp = this.now()
     record.run.transcript.entries.push({
@@ -296,7 +302,7 @@ export class AgentController {
       entry,
     })
     this.emitRunUpdated(record.run)
-    await record.session.prompt(userText)
+    await session.prompt(userText)
   }
 
   async openRunWorktreeInEditor(runId: string): Promise<void> {
@@ -433,7 +439,7 @@ export class AgentController {
         record.run.transcript.updatedAt = record.run.updatedAt
         this.emitRunUpdated(record.run)
       }
-      const cwd = record.run.worktree?.mode === 'git-worktree' && record.run.worktree.path ? record.run.worktree.path : this.projectDir
+      const cwd = this.getRunCwd(record.run)
       const { session } = await this.createSession(this.projectDir, {
         cwd,
         credentialProvider: this.credentialProvider,
@@ -496,6 +502,99 @@ export class AgentController {
     if (record.run.status === 'failed') {
       void this.cleanupRunWorktreeRecord(record, true)
     }
+  }
+
+  private async reopenRunSession(record: RunRecord): Promise<void> {
+    const health = this.computeResumeHealth(record.run)
+    record.run.resume = health
+    if (health.state !== 'available') {
+      this.emitRunUpdated(record.run)
+      throw new Error(`Run ${record.run.id} cannot be resumed: ${this.describeResumeHealth(health)}`)
+    }
+
+    const cwd = this.getRunCwd(record.run)
+    try {
+      const { session } = await this.createSession(this.projectDir, {
+        cwd,
+        sessionFile: record.run.sessionFile,
+        credentialProvider: this.credentialProvider,
+        modelRegistry: this.modelRegistry,
+      })
+      record.session = session
+      record.unsubscribeSession = session.subscribe((event) => {
+        this.handleSessionEvent(record.run.id, event)
+      })
+      record.run.sessionId = session.sessionId
+      record.run.sessionFile = session.sessionFile
+      record.run.model = session.model ? { provider: session.model.provider, id: session.model.id } : undefined
+      record.run.resume = { state: 'available', lastCheckedAt: this.now(), error: null }
+      record.run.updatedAt = this.now()
+      record.run.transcript.updatedAt = record.run.updatedAt
+      this.emitRunUpdated(record.run)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      record.run.resume = {
+        state: 'invalid-session-file',
+        lastCheckedAt: this.now(),
+        error: message,
+      }
+      record.run.updatedAt = this.now()
+      record.run.transcript.updatedAt = record.run.updatedAt
+      this.emitRunUpdated(record.run)
+      throw new Error(`Run ${record.run.id} cannot be resumed: invalid pi session file. ${message}`)
+    }
+  }
+
+  private computeResumeHealth(run: AgentRunState): AgentRunResumeHealth {
+    const checkedAt = this.now()
+    if (run.worktree?.mode === 'git-worktree') {
+      if (run.worktree.status === 'cleaned') {
+        return { state: 'worktree-cleaned', lastCheckedAt: checkedAt, error: `Worktree for run ${run.id} was cleaned.` }
+      }
+      if (!run.worktree.path) {
+        return { state: 'worktree-missing', lastCheckedAt: checkedAt, error: `Run ${run.id} does not record a retained worktree path.` }
+      }
+      if (!fs.existsSync(run.worktree.path)) {
+        return { state: 'worktree-missing', lastCheckedAt: checkedAt, error: `Worktree path ${run.worktree.path} does not exist.` }
+      }
+      if (run.worktree.status !== 'ready') {
+        return { state: 'worktree-missing', lastCheckedAt: checkedAt, error: `Worktree for run ${run.id} is ${run.worktree.status}.` }
+      }
+    }
+
+    if (!run.sessionFile) return { state: 'not-started', lastCheckedAt: checkedAt, error: 'No pi session file was recorded.' }
+    if (!fs.existsSync(run.sessionFile)) {
+      return { state: 'missing-session-file', lastCheckedAt: checkedAt, error: `Session file ${run.sessionFile} does not exist.` }
+    }
+    return { state: 'available', lastCheckedAt: checkedAt, error: null }
+  }
+
+  private describeResumeHealth(health: AgentRunResumeHealth): string {
+    if (health.error) return health.error
+    switch (health.state) {
+      case 'available':
+        return 'resume health is available.'
+      case 'not-started':
+        return 'no pi session file was recorded.'
+      case 'missing-session-file':
+        return 'the pi session file is missing.'
+      case 'invalid-session-file':
+        return 'the pi session file is invalid.'
+      case 'cwd-mismatch':
+        return 'the recorded session cwd does not match the run cwd.'
+      case 'worktree-missing':
+        return 'the retained worktree is missing.'
+      case 'worktree-cleaned':
+        return 'the retained worktree was cleaned.'
+    }
+  }
+
+  private getRunCwd(run: AgentRunState): string {
+    if (run.worktree?.mode === 'git-worktree') {
+      if (!run.worktree.path) throw new Error(`Run ${run.id} does not record a retained worktree path.`)
+      return run.worktree.path
+    }
+    return this.projectDir
   }
 
   private async cleanupRunWorktreeRecord(record: RunRecord, removeBranch: boolean): Promise<void> {

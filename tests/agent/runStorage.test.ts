@@ -6,7 +6,7 @@ import type { AgentSession, AgentSessionEvent, AuthStorage, ModelRegistry } from
 import { AgentController } from '../../src/agent/AgentController'
 import { LoginController } from '../../src/agent/LoginController'
 import { AgentRunStorage } from '../../src/agent/runStorage'
-import type { AgentRunState } from '../../src/agent/types'
+import type { AgentRunState, AgentRunWorktreeState } from '../../src/agent/types'
 
 const tempDirs: string[] = []
 
@@ -200,6 +200,161 @@ describe('AgentRunStorage', () => {
       }),
     ])
   })
+
+  test('AgentController reopens a persisted shared-project run for follow-up prompts after restart', async () => {
+    const projectDir = await makeTempProject()
+    const sessionFile = path.join(projectDir, '.awb', 'pi-sessions', 'session-1.jsonl')
+    await fs.mkdir(path.dirname(sessionFile), { recursive: true })
+    await fs.writeFile(sessionFile, '{"type":"session","id":"session-1","timestamp":"2026-05-11T00:00:00.000Z","cwd":"ignored"}\n')
+    new AgentRunStorage(projectDir, () => 3000).save(makeRun({ sessionId: 'session-1', sessionFile }))
+
+    const reopened = createMockSession({ sessionId: 'session-1', sessionFile })
+    const createSessionCalls: Array<{ cwd?: string; sessionFile?: string }> = []
+    const controller = new AgentController(projectDir, {
+      createSession: async (_projectDir, options) => {
+        createSessionCalls.push({ cwd: options.cwd, sessionFile: options.sessionFile })
+        return { session: reopened.session }
+      },
+      createRunId: () => {
+        throw new Error('prompting a persisted run must not create a new run')
+      },
+      now: createIncrementingNow(4000),
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now: () => 4000 }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      runStorage: new AgentRunStorage(projectDir, () => 4000),
+    })
+
+    await controller.ensureStarted()
+    await controller.promptRun('run-1', 'Continue after restart.')
+
+    expect(createSessionCalls).toEqual([{ cwd: projectDir, sessionFile }])
+    expect(controller.listRuns().map((run) => run.id)).toEqual(['run-1'])
+    expect(reopened.promptCalls).toEqual(['Continue after restart.'])
+    expect(controller.getRun('run-1')?.transcript.entries.map((entry) => [entry.role, entry.text])).toEqual([
+      ['user', 'Hello'],
+      ['user', 'Continue after restart.'],
+    ])
+    expect(controller.getRun('run-1')?.resume).toEqual(expect.objectContaining({ state: 'available' }))
+  })
+
+  test('AgentController reopens persisted worktree runs in the retained worktree cwd', async () => {
+    const projectDir = await makeTempProject()
+    const worktreePath = path.join(projectDir, '.awb', 'worktrees', 'run-1')
+    const sessionFile = path.join(projectDir, '.awb', 'pi-sessions', 'session-1.jsonl')
+    await fs.mkdir(worktreePath, { recursive: true })
+    await fs.mkdir(path.dirname(sessionFile), { recursive: true })
+    await fs.writeFile(sessionFile, '{"type":"session","id":"session-1","timestamp":"2026-05-11T00:00:00.000Z","cwd":"ignored"}\n')
+    new AgentRunStorage(projectDir, () => 3000).save(
+      makeRun({
+        sessionId: 'session-1',
+        sessionFile,
+        worktree: makeWorktree({ path: worktreePath }),
+      }),
+    )
+
+    const reopened = createMockSession({ sessionId: 'session-1', sessionFile })
+    const createSessionCalls: Array<{ cwd?: string; sessionFile?: string }> = []
+    const controller = new AgentController(projectDir, {
+      createSession: async (_projectDir, options) => {
+        createSessionCalls.push({ cwd: options.cwd, sessionFile: options.sessionFile })
+        return { session: reopened.session }
+      },
+      createRunId: () => 'unused',
+      now: createIncrementingNow(5000),
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now: () => 5000 }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      runStorage: new AgentRunStorage(projectDir, () => 5000),
+    })
+
+    await controller.ensureStarted()
+    await controller.promptRun('run-1', 'Continue in the retained worktree.')
+
+    expect(createSessionCalls).toEqual([{ cwd: worktreePath, sessionFile }])
+    expect(reopened.promptCalls).toEqual(['Continue in the retained worktree.'])
+  })
+
+  test('AgentController rejects persisted prompts when resume health is unavailable', async () => {
+    const projectDir = await makeTempProject()
+    const missingSessionFile = path.join(projectDir, '.awb', 'pi-sessions', 'missing.jsonl')
+    new AgentRunStorage(projectDir, () => 3000).save(makeRun({ sessionId: 'session-1', sessionFile: missingSessionFile }))
+
+    const controller = new AgentController(projectDir, {
+      createSession: async () => {
+        throw new Error('unavailable resume state must not open a session')
+      },
+      createRunId: () => 'unused',
+      now: createIncrementingNow(6000),
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now: () => 6000 }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      runStorage: new AgentRunStorage(projectDir, () => 6000),
+    })
+
+    await controller.ensureStarted()
+
+    await expect(controller.promptRun('run-1', 'Continue.')).rejects.toThrow(`Session file ${missingSessionFile} does not exist.`)
+    expect(controller.getRun('run-1')?.resume).toEqual(expect.objectContaining({ state: 'missing-session-file' }))
+    expect(controller.getRun('run-1')?.transcript.entries.map((entry) => entry.text)).toEqual(['Hello'])
+  })
+
+  test('AgentController does not resume cleaned or missing worktree runs in the main checkout', async () => {
+    const projectDir = await makeTempProject()
+    const sessionFile = path.join(projectDir, '.awb', 'pi-sessions', 'session-1.jsonl')
+    await fs.mkdir(path.dirname(sessionFile), { recursive: true })
+    await fs.writeFile(sessionFile, '{"type":"session","id":"session-1","timestamp":"2026-05-11T00:00:00.000Z","cwd":"ignored"}\n')
+    new AgentRunStorage(projectDir, () => 3000).save(
+      makeRun({
+        sessionId: 'session-1',
+        sessionFile,
+        worktree: makeWorktree({ path: path.join(projectDir, '.awb', 'worktrees', 'run-1'), status: 'cleaned' }),
+      }),
+    )
+
+    const controller = new AgentController(projectDir, {
+      createSession: async () => {
+        throw new Error('cleaned worktree runs must not open a session')
+      },
+      createRunId: () => 'unused',
+      now: createIncrementingNow(7000),
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now: () => 7000 }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      runStorage: new AgentRunStorage(projectDir, () => 7000),
+    })
+
+    await controller.ensureStarted()
+
+    await expect(controller.promptRun('run-1', 'Continue.')).rejects.toThrow('Worktree for run run-1 was cleaned.')
+    expect(controller.getRun('run-1')?.resume).toEqual(expect.objectContaining({ state: 'worktree-cleaned' }))
+  })
+
+  test('AgentController records invalid session files when reopening fails', async () => {
+    const projectDir = await makeTempProject()
+    const sessionFile = path.join(projectDir, '.awb', 'pi-sessions', 'session-1.jsonl')
+    await fs.mkdir(path.dirname(sessionFile), { recursive: true })
+    await fs.writeFile(sessionFile, 'not jsonl\n')
+    new AgentRunStorage(projectDir, () => 3000).save(makeRun({ sessionId: 'session-1', sessionFile }))
+
+    const controller = new AgentController(projectDir, {
+      createSession: async () => {
+        throw new Error('invalid session contents')
+      },
+      createRunId: () => 'unused',
+      now: createIncrementingNow(8000),
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now: () => 8000 }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+      runStorage: new AgentRunStorage(projectDir, () => 8000),
+    })
+
+    await controller.ensureStarted()
+
+    await expect(controller.promptRun('run-1', 'Continue.')).rejects.toThrow('invalid pi session file. invalid session contents')
+    expect(controller.getRun('run-1')?.resume).toEqual(expect.objectContaining({ state: 'invalid-session-file', error: 'invalid session contents' }))
+    expect(controller.getRun('run-1')?.transcript.entries.map((entry) => entry.text)).toEqual(['Hello'])
+  })
 })
 
 async function makeTempProject(): Promise<string> {
@@ -229,4 +384,45 @@ function makeRun(overrides: Partial<AgentRunState> = {}): AgentRunState {
     worktree: { mode: 'shared-project', status: 'not-requested' },
     ...overrides,
   }
+}
+
+function makeWorktree(overrides: Partial<AgentRunWorktreeState> = {}): AgentRunWorktreeState {
+  return {
+    mode: 'git-worktree',
+    status: 'ready',
+    path: '/tmp/awb-worktree',
+    branch: 'awb/run/run-1',
+    baseRef: 'HEAD',
+    headSha: 'abc123',
+    createdAt: 1001,
+    lastCheckedAt: 1001,
+    ...overrides,
+  }
+}
+
+function createIncrementingNow(start: number): () => number {
+  let current = start
+  return () => ++current
+}
+
+function createMockSession(options: { sessionId: string; sessionFile: string }) {
+  const listeners = new Set<(event: AgentSessionEvent) => void>()
+  const promptCalls: string[] = []
+  const session = {
+    sessionId: options.sessionId,
+    sessionFile: options.sessionFile,
+    model: { provider: 'test', id: 'mock-model' },
+    subscribe: (next: (event: AgentSessionEvent) => void) => {
+      listeners.add(next)
+      return () => {
+        listeners.delete(next)
+      }
+    },
+    prompt: async (text: string) => {
+      promptCalls.push(text)
+    },
+    abort: async () => {},
+    dispose: () => {},
+  } as unknown as AgentSession
+  return { session, promptCalls }
 }
