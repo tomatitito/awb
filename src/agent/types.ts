@@ -65,6 +65,12 @@ export type AgentRunWorktreeState = {
   cleanupError?: string
 }
 
+export type AgentRunResumeHealth = {
+  state: 'available' | 'not-started' | 'missing-session-file' | 'invalid-session-file' | 'cwd-mismatch' | 'worktree-missing' | 'worktree-cleaned'
+  lastCheckedAt: number
+  error?: string | null
+}
+
 export type AgentRunState = {
   id: string
   context: AgentRunContext
@@ -86,6 +92,7 @@ export type AgentRunState = {
   }
   lastError?: string
   worktree?: AgentRunWorktreeState
+  resume?: AgentRunResumeHealth
 }
 
 export type AgentRunEvent =

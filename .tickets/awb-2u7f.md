@@ -2,7 +2,7 @@
 id: awb-2u7f
 status: closed
 deps: []
-links: []
+links: [awb-wefc]
 created: 2026-04-29T00:00:00Z
 type: epic
 priority: 2

@@ -8,6 +8,7 @@ import express from 'express'
 import { AgentController } from './agent/AgentController.js'
 import { createPiSession } from './agent/createPiSession.js'
 import { LoginController } from './agent/LoginController.js'
+import { AgentRunStorage } from './agent/runStorage.js'
 import type { SelectedTicketContext } from './agent/types.js'
 import { GitWorktreeManager } from './agent/worktree.js'
 import { loadAwbSettings } from './config.js'
@@ -53,7 +54,7 @@ export async function startServer(options: StartServerOptions): Promise<{ server
       loadTickets,
       loadAwbSettings,
       watch: fs.watch,
-      createAgentController: (projectDir, controllerOptions) => new AgentController(projectDir, controllerOptions),
+      createAgentController: (projectDir, controllerOptions) => new AgentController(projectDir, { ...controllerOptions, runStorage: new AgentRunStorage(projectDir, now) }),
       createWorktreeManager: (projectDir, worktreeOptions) => new GitWorktreeManager(projectDir, worktreeOptions),
       createLoginController: (loginOptions) => new LoginController(loginOptions),
       createSession: createPiSession,

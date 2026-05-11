@@ -3,6 +3,7 @@ import type { AgentSession, AgentSessionEvent, ModelRegistry } from '@mariozechn
 import { openPathInEditor } from '../editor.js'
 import type { CredentialProvider, createPiSession } from './createPiSession.js'
 import type { LoginController } from './LoginController.js'
+import type { AgentRunStorage } from './runStorage.js'
 import type {
   AgentAuthProviderState,
   AgentLoginFlowState,
@@ -41,6 +42,7 @@ type AgentControllerOptions = {
   modelRegistry: ModelRegistry
   worktreeManager?: WorktreeManager
   editorCommand?: string
+  runStorage?: AgentRunStorage
 }
 
 export class AgentController {
@@ -53,10 +55,12 @@ export class AgentController {
   private readonly modelRegistry: ModelRegistry
   private readonly worktreeManager?: WorktreeManager
   private readonly editorCommand?: string
+  private readonly runStorage?: AgentRunStorage
   private readonly runs = new Map<string, RunRecord>()
   private runOrder: string[] = []
   private selectedTicket?: SelectedTicketContext
   private hasReconciledStaleWorktrees = false
+  private hasLoadedPersistedRuns = false
 
   constructor(
     private readonly projectDir: string,
@@ -70,9 +74,23 @@ export class AgentController {
     this.modelRegistry = options.modelRegistry
     this.worktreeManager = options.worktreeManager
     this.editorCommand = options.editorCommand
+    this.runStorage = options.runStorage
   }
 
   async ensureStarted(): Promise<void> {
+    if (!this.hasLoadedPersistedRuns) {
+      const result = this.runStorage?.load()
+      if (result) {
+        for (const warning of result.warnings) console.warn(`awb: ${warning}`)
+        for (const run of result.runs) {
+          if (!this.runs.has(run.id)) this.runs.set(run.id, { run })
+        }
+        const liveRunIds = this.runOrder.filter((runId) => this.runs.has(runId))
+        const loadedRunIds = result.runs.map((run) => run.id).filter((runId) => !liveRunIds.includes(runId))
+        this.runOrder = [...liveRunIds, ...loadedRunIds]
+      }
+      this.hasLoadedPersistedRuns = true
+    }
     this.modelRegistry.refresh()
     if (!this.hasReconciledStaleWorktrees) {
       await this.worktreeManager?.reconcileStaleWorktrees()
@@ -194,6 +212,7 @@ export class AgentController {
 
     this.runs.set(runId, { run })
     this.runOrder = [runId, ...this.runOrder]
+    this.persistRun(run)
     this.emit({ type: 'run-created', run })
     void this.startRun(runId)
     return run
@@ -244,6 +263,7 @@ export class AgentController {
 
     this.runs.set(runId, { run })
     this.runOrder = [runId, ...this.runOrder]
+    this.persistRun(run)
     this.emit({ type: 'run-created', run })
     void this.startRun(runId)
     return run
@@ -469,7 +489,10 @@ export class AgentController {
     const record = this.runs.get(runId)
     if (!record) return
     const events = applySessionEvent(record.run, event, this.now)
-    for (const e of events) this.emit(e)
+    for (const e of events) {
+      if (e.type === 'run-updated') this.persistRun(e.run)
+      this.emit(e)
+    }
     if (record.run.status === 'failed') {
       void this.cleanupRunWorktreeRecord(record, true)
     }
@@ -505,7 +528,17 @@ export class AgentController {
   }
 
   private emitRunUpdated(run: AgentRunState): void {
+    this.persistRun(run)
     this.emit({ type: 'run-updated', run })
+  }
+
+  private persistRun(run: AgentRunState): void {
+    try {
+      this.runStorage?.save(run)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`awb: failed to persist agent run ${run.id}: ${message}`)
+    }
   }
 
   private toPanelStatus(status: AgentRunState['status']): AgentPanelState['status'] {

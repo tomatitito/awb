@@ -1,6 +1,6 @@
 ---
 id: awb-s0fx
-status: open
+status: closed
 deps: [awb-vf2e]
 links: []
 created: 2026-05-11T08:51:52Z
