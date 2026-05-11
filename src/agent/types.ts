@@ -22,7 +22,7 @@ export type SelectedTicketContext = {
   filePath: string
 }
 
-export type AgentRunStatus = 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'aborted'
+export type AgentRunStatus = 'queued' | 'starting' | 'running' | 'waiting' | 'completed' | 'failed' | 'aborted' | 'closed'
 
 export type AgentRunTranscriptEntry = {
   id: string
@@ -73,6 +73,7 @@ export type AgentRunState = {
   startedAt?: number
   completedAt?: number
   abortedAt?: number
+  closedAt?: number
   updatedAt: number
   transcript: AgentRunTranscript
   queuedSteeringCount: number

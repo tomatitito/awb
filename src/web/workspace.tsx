@@ -915,6 +915,18 @@ function isActiveAgentRun(run: AgentRunState): boolean {
   return run.status === 'queued' || run.status === 'starting' || run.status === 'running'
 }
 
+function getReadOnlyRunCopy(run: AgentRunState): string {
+  if (run.status === 'failed') {
+    return 'This run failed and is read-only. Start a new agent chat or run the ticket again to continue from a fresh agent session.'
+  }
+
+  if (run.status === 'aborted') {
+    return 'This run was stopped before completion and is read-only. Start a new agent chat or run the ticket again to continue from a fresh agent session.'
+  }
+
+  return 'This run is read-only because it is no longer active.'
+}
+
 function formatAgentRunEntryTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
@@ -960,10 +972,12 @@ function AgentRunDetail({
 }) {
   const [promptText, setPromptText] = useState('')
   const [actionError, setActionError] = useState<string | undefined>()
+  const [composerError, setComposerError] = useState<string | undefined>()
 
   useEffect(() => {
     setPromptText(run?.context.kind === 'ticket' ? 'Continue implementing the ticket and report progress.' : '')
     setActionError(undefined)
+    setComposerError(undefined)
   }, [run])
 
   if (!run) {
@@ -971,6 +985,9 @@ function AgentRunDetail({
   }
 
   const active = isActiveAgentRun(run)
+  const canContinue = run.status === 'completed'
+  const waitingForPrompt = run.status === 'waiting'
+  const canPrompt = active || canContinue || waitingForPrompt
   const transcript = run.transcript.entries
   const toolActivity = [...run.transcript.toolActivity].slice(-12).reverse()
   const hasRetainedWorktree = run.worktree?.mode === 'git-worktree' && run.worktree.status === 'ready' && Boolean(run.worktree.path)
@@ -1099,45 +1116,54 @@ function AgentRunDetail({
         </div>
       </section>
 
-      {active ? (
+      {canPrompt ? (
         <form
           className="agent-composer"
           onSubmit={(event) => {
             event.preventDefault()
             const text = promptText.trim()
             if (!text) return
-            setActionError(undefined)
+            setComposerError(undefined)
             void onSendPrompt(run.id, text).catch((error) => {
-              setActionError(error instanceof Error ? error.message : String(error))
+              setComposerError(error instanceof Error ? error.message : String(error))
             })
           }}
         >
-          <strong>Follow-up prompt</strong>
-          <textarea value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Ask the run what to do next" rows={5} />
-          {actionError ? <div className="agent-panel-error">{actionError}</div> : null}
+          <strong>{canContinue ? 'Continue / resume conversation' : 'Follow-up prompt'}</strong>
+          {canContinue ? <div className="agent-panel-copy">Send a follow-up prompt to continue this completed conversation.</div> : null}
+          <textarea
+            value={promptText}
+            onChange={(event) => setPromptText(event.target.value)}
+            placeholder={canContinue ? 'Ask the agent to resume with the next step' : 'Ask the run what to do next'}
+            rows={5}
+          />
+          {composerError ? <div className="agent-panel-error">{composerError}</div> : null}
           <div className="agent-run-controls">
             <button type="submit" className="primary-button" disabled={run.status === 'queued' || run.status === 'starting'}>
-              Send
+              {canContinue ? 'Continue conversation' : 'Send'}
             </button>
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={run.status === 'queued' || run.status === 'starting'}
-              onClick={() => {
-                setActionError(undefined)
-                void onAbortRun(run.id).catch((error) => {
-                  setActionError(error instanceof Error ? error.message : String(error))
-                })
-              }}
-            >
-              Stop
-            </button>
+            {active ? (
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={run.status === 'queued' || run.status === 'starting'}
+                onClick={() => {
+                  setActionError(undefined)
+                  void onAbortRun(run.id).catch((error) => {
+                    setActionError(error instanceof Error ? error.message : String(error))
+                  })
+                }}
+              >
+                Stop
+              </button>
+            ) : null}
           </div>
         </form>
       ) : (
         <section className="agent-panel-section">
           <strong>Run state</strong>
-          <div className="agent-panel-copy">This run is read-only because it is no longer active.</div>
+          <div className="agent-panel-copy">{getReadOnlyRunCopy(run)}</div>
+          {run.lastError ? <div className="agent-panel-error">{run.lastError}</div> : null}
         </section>
       )}
     </section>

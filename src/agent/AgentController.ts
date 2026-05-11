@@ -254,8 +254,10 @@ export class AgentController {
     if (!userText) throw new Error('Prompt text is required.')
 
     const record = this.requireRun(runId)
+    if (record.run.status === 'failed') throw new Error(`Run ${runId} has failed and cannot accept follow-up prompts.`)
+    if (record.run.status === 'aborted') throw new Error(`Run ${runId} has been aborted and cannot accept follow-up prompts.`)
+    if (record.run.status === 'closed') throw new Error(`Run ${runId} has been closed and cannot accept follow-up prompts.`)
     if (!record.session) throw new Error(`Run ${runId} is not ready for follow-up prompts yet.`)
-    if (record.run.status === 'aborted') throw new Error(`Run ${runId} has already been aborted.`)
 
     const timestamp = this.now()
     record.run.transcript.entries.push({
@@ -315,6 +317,32 @@ export class AgentController {
     this.emitRunUpdated(record.run)
   }
 
+  async closeUnticketedRun(runId: string): Promise<AgentRunState> {
+    const record = this.requireRun(runId)
+    if (record.run.context.kind !== 'unticketed') {
+      throw new Error(`Run ${runId} is ticket-backed and cannot be closed as an unticketed chat.`)
+    }
+
+    if (record.run.status === 'closed') return record.run
+
+    if (record.run.status === 'running' || record.run.status === 'starting') {
+      await record.session?.abort()
+    }
+
+    record.unsubscribeSession?.()
+    record.unsubscribeSession = undefined
+    record.session?.dispose()
+    record.session = undefined
+
+    const timestamp = this.now()
+    record.run.status = 'closed'
+    record.run.closedAt = timestamp
+    record.run.updatedAt = timestamp
+    record.run.transcript.updatedAt = timestamp
+    this.emitRunUpdated(record.run)
+    return record.run
+  }
+
   async prompt(text: string): Promise<void> {
     const latestRun = this.getLatestRun()
     if (!latestRun) {
@@ -369,6 +397,7 @@ export class AgentController {
 
   private async startRun(runId: string): Promise<void> {
     const record = this.requireRun(runId)
+    if (this.isRunClosed(record)) return
     const startedAt = this.now()
     record.run.status = 'starting'
     record.run.startedAt = startedAt
@@ -379,6 +408,7 @@ export class AgentController {
       this.modelRegistry.refresh()
       if (this.worktreeManager?.enabled) {
         record.run.worktree = await this.worktreeManager.provision(runId)
+        if (this.isRunClosed(record)) return
         record.run.updatedAt = this.now()
         record.run.transcript.updatedAt = record.run.updatedAt
         this.emitRunUpdated(record.run)
@@ -389,6 +419,10 @@ export class AgentController {
         credentialProvider: this.credentialProvider,
         modelRegistry: this.modelRegistry,
       })
+      if (this.isRunClosed(record)) {
+        session.dispose()
+        return
+      }
       record.session = session
       record.unsubscribeSession = session.subscribe((event) => {
         this.handleSessionEvent(runId, event)
@@ -399,8 +433,10 @@ export class AgentController {
       record.run.updatedAt = this.now()
       record.run.transcript.updatedAt = record.run.updatedAt
       this.emitRunUpdated(record.run)
+      if (this.isRunClosed(record)) return
       await session.prompt(record.run.transcript.initialPrompt)
     } catch (error) {
+      if (this.isRunClosed(record)) return
       const message = error instanceof Error ? error.message : String(error)
       const timestamp = this.now()
       record.run.status = 'failed'
@@ -453,6 +489,10 @@ export class AgentController {
     return record
   }
 
+  private isRunClosed(record: RunRecord): boolean {
+    return record.run.status === 'closed'
+  }
+
   private getLatestRun(): AgentRunState | undefined {
     const latestRunId = this.runOrder[0]
     return latestRunId ? this.runs.get(latestRunId)?.run : undefined
@@ -475,7 +515,9 @@ export class AgentController {
         return 'connecting'
       case 'running':
         return 'running'
+      case 'waiting':
       case 'completed':
+      case 'closed':
         return 'ready'
       case 'failed':
       case 'aborted':
@@ -489,16 +531,30 @@ export function applySessionEvent(run: AgentRunState, event: AgentSessionEvent, 
 
   switch (event.type) {
     case 'agent_start': {
+      const timestamp = now()
       run.status = 'running'
-      run.updatedAt = now()
+      run.startedAt = timestamp
+      run.completedAt = undefined
+      run.closedAt = undefined
+      run.updatedAt = timestamp
       return [{ type: 'run-updated', run }]
     }
     case 'agent_end': {
       const timestamp = now()
       if (run.status !== 'aborted' && run.status !== 'failed') {
-        run.status = run.lastError ? 'failed' : 'completed'
+        if (run.lastError) {
+          run.status = 'failed'
+          run.completedAt = timestamp
+        } else if (run.context.kind === 'unticketed') {
+          run.status = 'waiting'
+          run.completedAt = undefined
+        } else {
+          run.status = 'completed'
+          run.completedAt = timestamp
+        }
+      } else {
+        run.completedAt ??= timestamp
       }
-      run.completedAt ??= timestamp
       run.updatedAt = timestamp
       return [{ type: 'run-updated', run }]
     }
@@ -614,7 +670,7 @@ export function toLegacyPanelEvent(event: AgentRunEvent): AgentPanelEvent | unde
               ? 'running'
               : event.run.status === 'failed' || event.run.status === 'aborted'
                 ? 'error'
-                : event.run.status === 'completed'
+                : event.run.status === 'completed' || event.run.status === 'waiting' || event.run.status === 'closed'
                   ? 'ready'
                   : 'connecting',
           sessionId: event.run.sessionId,

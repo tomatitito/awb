@@ -3,17 +3,20 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { AgentRunState } from '../../src/agent/types'
 import { AgentsView } from '../../src/web/workspace'
 
-function makeUnticketedRun(): AgentRunState {
+function makeUnticketedRun(status: AgentRunState['status'] = 'running'): AgentRunState {
   return {
     id: 'run-chat-1',
     context: {
       kind: 'unticketed',
       title: 'Refine the release checklist and add a new ticket',
     },
-    status: 'running',
+    status,
     createdAt: 1000,
     startedAt: 1001,
+    completedAt: status === 'completed' || status === 'failed' || status === 'aborted' ? 1003 : undefined,
+    abortedAt: status === 'aborted' ? 1003 : undefined,
     updatedAt: 1002,
+    lastError: status === 'failed' ? 'Agent runtime rejected the run.' : undefined,
     transcript: {
       runId: 'run-chat-1',
       initialPrompt: 'Refine the release checklist and add a new ticket',
@@ -79,5 +82,86 @@ describe('AgentsView unticketed runs', () => {
     expect(html).toContain('New agent chat')
     expect(html).toContain('No agent runs yet.')
     expect(html).toContain('Start a new unticketed agent conversation')
+  })
+
+  test('shows a continue composer for completed runs', () => {
+    const html = renderToStaticMarkup(
+      <AgentsView
+        runs={[makeUnticketedRun('completed')]}
+        selectedRunId="run-chat-1"
+        onSelectRun={() => {}}
+        onBack={() => {}}
+        onSendPrompt={async () => {}}
+        onAbortRun={async () => {}}
+        onOpenWorktree={async () => {}}
+        onCleanupWorktree={async () => {}}
+        onCreateUnticketedRun={async () => makeUnticketedRun()}
+        viewportMode="desktop"
+      />,
+    )
+
+    expect(html).toContain('Continue / resume conversation')
+    expect(html).toContain('Send a follow-up prompt to continue this completed conversation.')
+    expect(html).toContain('Continue conversation')
+    expect(html).not.toContain('This run is read-only because it is no longer active.')
+    expect(html).not.toContain('>Stop<')
+  })
+
+  test('keeps failed and aborted runs read-only with explanatory copy', () => {
+    const failedHtml = renderToStaticMarkup(
+      <AgentsView
+        runs={[makeUnticketedRun('failed')]}
+        selectedRunId="run-chat-1"
+        onSelectRun={() => {}}
+        onBack={() => {}}
+        onSendPrompt={async () => {}}
+        onAbortRun={async () => {}}
+        onOpenWorktree={async () => {}}
+        onCleanupWorktree={async () => {}}
+        onCreateUnticketedRun={async () => makeUnticketedRun()}
+        viewportMode="desktop"
+      />,
+    )
+    const abortedHtml = renderToStaticMarkup(
+      <AgentsView
+        runs={[makeUnticketedRun('aborted')]}
+        selectedRunId="run-chat-1"
+        onSelectRun={() => {}}
+        onBack={() => {}}
+        onSendPrompt={async () => {}}
+        onAbortRun={async () => {}}
+        onOpenWorktree={async () => {}}
+        onCleanupWorktree={async () => {}}
+        onCreateUnticketedRun={async () => makeUnticketedRun()}
+        viewportMode="desktop"
+      />,
+    )
+
+    expect(failedHtml).toContain('This run failed and is read-only.')
+    expect(failedHtml).toContain('Agent runtime rejected the run.')
+    expect(failedHtml).not.toContain('Continue / resume conversation')
+    expect(abortedHtml).toContain('This run was stopped before completion and is read-only.')
+    expect(abortedHtml).not.toContain('Continue / resume conversation')
+  })
+
+  test('shows the completed-run continue affordance in the mobile detail view', () => {
+    const html = renderToStaticMarkup(
+      <AgentsView
+        runs={[makeUnticketedRun('completed')]}
+        selectedRunId="run-chat-1"
+        onSelectRun={() => {}}
+        onBack={() => {}}
+        onSendPrompt={async () => {}}
+        onAbortRun={async () => {}}
+        onOpenWorktree={async () => {}}
+        onCleanupWorktree={async () => {}}
+        onCreateUnticketedRun={async () => makeUnticketedRun()}
+        viewportMode="mobile"
+      />,
+    )
+
+    expect(html).toContain('Back')
+    expect(html).toContain('Continue / resume conversation')
+    expect(html).toContain('Continue conversation')
   })
 })

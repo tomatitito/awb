@@ -211,6 +211,17 @@ export async function startServer(options: StartServerOptions): Promise<{ server
     }
   })
 
+  app.post('/api/agent/runs/:runId/close', async (request, response) => {
+    try {
+      const run = await runtime.agentController.closeUnticketedRun(request.params.runId)
+      response.status(202).json({ run })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const status = message.includes('not found') ? 404 : 409
+      response.status(status).json({ message })
+    }
+  })
+
   app.post('/api/agent/runs/:runId/worktree/open', async (request, response) => {
     try {
       await runtime.agentController.openRunWorktreeInEditor(request.params.runId)

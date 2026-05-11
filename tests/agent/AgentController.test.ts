@@ -35,6 +35,8 @@ function makeTicket(overrides: Partial<Omit<TicketRunContext, 'kind'>> & { ticke
 function createMockSession() {
   const listeners = new Set<(event: AgentSessionEvent) => void>()
   const promptCalls: string[] = []
+  let abortCalls = 0
+  let disposeCalls = 0
   let isStreaming = false
 
   const session = {
@@ -48,18 +50,27 @@ function createMockSession() {
       promptCalls.push(text)
     },
     async abort() {
+      abortCalls += 1
       isStreaming = false
     },
     subscribe(listener: (event: AgentSessionEvent) => void) {
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
-    dispose() {},
+    dispose() {
+      disposeCalls += 1
+    },
   } as unknown as AgentSession
 
   return {
     session,
     promptCalls,
+    get abortCalls() {
+      return abortCalls
+    },
+    get disposeCalls() {
+      return disposeCalls
+    },
     emit(event: AgentSessionEvent) {
       if (event.type === 'agent_start') isStreaming = true
       if (event.type === 'agent_end') isStreaming = false
@@ -189,6 +200,53 @@ describe('AgentController', () => {
     expect(mockSession.promptCalls[0]).not.toContain('Ticket ID:')
   })
 
+  test('keeps unticketed chats waiting and promptable across assistant turns', async () => {
+    const mockSession = createMockSession()
+    const now = (() => {
+      let current = 1600
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => ({ session: mockSession.session }),
+      createRunId: () => 'run-chat-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const run = await controller.createUnticketedRun('Start a planning chat.')
+    await Promise.resolve()
+
+    mockSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    mockSession.emit({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        timestamp: 1700,
+        content: [{ type: 'text', text: 'Ready for the next prompt.' }],
+      },
+    } as AgentSessionEvent)
+    mockSession.emit({ type: 'agent_end' } as AgentSessionEvent)
+
+    expect(controller.getRun(run.id)?.status).toBe('waiting')
+    expect(controller.getRun(run.id)?.completedAt).toBeUndefined()
+
+    await controller.promptRun(run.id, 'Continue with the next step.')
+    mockSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    expect(controller.getRun(run.id)?.status).toBe('running')
+    mockSession.emit({ type: 'agent_end' } as AgentSessionEvent)
+
+    const next = controller.getRun(run.id)
+    expect(next?.status).toBe('waiting')
+    expect(next?.transcript.entries.map((entry) => [entry.role, entry.text])).toEqual([
+      ['user', 'Start a planning chat.'],
+      ['assistant', 'Ready for the next prompt.'],
+      ['user', 'Continue with the next step.'],
+    ])
+    expect(mockSession.promptCalls).toEqual(['Start a planning chat.', 'Continue with the next step.'])
+  })
+
   test('records transcript and tool activity on a specific run', async () => {
     const mockSession = createMockSession()
     const now = (() => {
@@ -247,6 +305,115 @@ describe('AgentController', () => {
     ])
     expect(next?.transcript.toolActivity).toEqual([expect.objectContaining({ toolCallId: 'tool-1', toolName: 'read', isError: false })])
     expect(mockSession.promptCalls.at(-1)).toBe('Please add a regression test.')
+  })
+
+  test('continues a completed in-memory run without creating another run', async () => {
+    const mockSession = createMockSession()
+    const now = (() => {
+      let current = 2500
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => ({ session: mockSession.session }),
+      createRunId: () => 'run-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const run = await controller.createRun(makeTicket({ ticketId: 'awb-1', body: 'Do the thing.' }))
+    await Promise.resolve()
+    mockSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    mockSession.emit({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        timestamp: 2600,
+        content: [{ type: 'text', text: 'Initial answer' }],
+      },
+    } as AgentSessionEvent)
+    mockSession.emit({ type: 'agent_end' } as AgentSessionEvent)
+
+    const firstCompletedAt = controller.getRun(run.id)?.completedAt
+    await controller.promptRun(run.id, 'Please continue in the same session.')
+
+    expect(controller.listRuns().map((listedRun) => listedRun.id)).toEqual(['run-1'])
+    expect(mockSession.promptCalls).toEqual([expect.stringContaining('Ticket ID: awb-1'), 'Please continue in the same session.'])
+    expect(controller.getRun(run.id)?.transcript.entries.map((entry) => [entry.role, entry.text])).toEqual([
+      ['user', expect.stringContaining('Ticket ID: awb-1')],
+      ['assistant', 'Initial answer'],
+      ['user', 'Please continue in the same session.'],
+    ])
+
+    mockSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    expect(controller.getRun(run.id)?.status).toBe('running')
+    expect(controller.getRun(run.id)?.completedAt).toBeUndefined()
+    mockSession.emit({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        timestamp: 2700,
+        content: [{ type: 'text', text: 'Follow-up answer' }],
+      },
+    } as AgentSessionEvent)
+    mockSession.emit({ type: 'agent_end' } as AgentSessionEvent)
+
+    const next = controller.getRun(run.id)
+    expect(next?.status).toBe('completed')
+    expect(next?.completedAt).toBeGreaterThan(firstCompletedAt ?? 0)
+    expect(next?.transcript.entries.map((entry) => [entry.role, entry.text])).toEqual([
+      ['user', expect.stringContaining('Ticket ID: awb-1')],
+      ['assistant', 'Initial answer'],
+      ['user', 'Please continue in the same session.'],
+      ['assistant', 'Follow-up answer'],
+    ])
+  })
+
+  test('rejects follow-up prompts for failed and aborted runs', async () => {
+    const failedSession = createMockSession()
+    const abortedSession = createMockSession()
+    const sessions = [failedSession, abortedSession]
+    let runNumber = 0
+    const now = (() => {
+      let current = 2800
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => {
+        const next = sessions.shift()
+        if (!next) throw new Error('missing session')
+        return { session: next.session }
+      },
+      createRunId: () => `run-${++runNumber}`,
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const failedRun = await controller.createRun(makeTicket({ ticketId: 'awb-1' }))
+    const abortedRun = await controller.createRun(makeTicket({ ticketId: 'awb-2' }))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    failedSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    failedSession.emit({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        timestamp: 2900,
+        content: [{ type: 'text', text: 'failed' }],
+        errorMessage: 'boom',
+      },
+    } as AgentSessionEvent)
+    abortedSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    await controller.abortRun(abortedRun.id)
+
+    await expect(controller.promptRun(failedRun.id, 'retry')).rejects.toThrow('Run run-1 has failed and cannot accept follow-up prompts.')
+    await expect(controller.promptRun(abortedRun.id, 'retry')).rejects.toThrow('Run run-2 has been aborted and cannot accept follow-up prompts.')
+    expect(failedSession.promptCalls).toHaveLength(1)
+    expect(abortedSession.promptCalls).toHaveLength(1)
   })
 
   test('provisions a worktree before creating the session when isolation is enabled', async () => {
@@ -375,5 +542,83 @@ describe('AgentController', () => {
     expect(next?.status).toBe('aborted')
     expect(next?.abortedAt).toBeDefined()
     expect(controller.listRuns()).toHaveLength(1)
+  })
+
+  test('closes a waiting unticketed chat without marking it aborted', async () => {
+    const mockSession = createMockSession()
+    const now = (() => {
+      let current = 5000
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => ({ session: mockSession.session }),
+      createRunId: () => 'run-chat-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const run = await controller.createUnticketedRun('Help me plan.')
+    await Promise.resolve()
+    mockSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+    mockSession.emit({ type: 'agent_end' } as AgentSessionEvent)
+
+    const closed = await controller.closeUnticketedRun(run.id)
+
+    expect(closed.status).toBe('closed')
+    expect(closed.closedAt).toBeDefined()
+    expect(closed.abortedAt).toBeUndefined()
+    expect(mockSession.abortCalls).toBe(0)
+    expect(mockSession.disposeCalls).toBe(1)
+    await expect(controller.promptRun(run.id, 'Are you still there?')).rejects.toThrow('has been closed')
+  })
+
+  test('closing a running unticketed chat aborts the active response before closing', async () => {
+    const mockSession = createMockSession()
+    const now = (() => {
+      let current = 6000
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => ({ session: mockSession.session }),
+      createRunId: () => 'run-chat-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const run = await controller.createUnticketedRun('Help me plan.')
+    await Promise.resolve()
+    mockSession.emit({ type: 'agent_start' } as AgentSessionEvent)
+
+    const closed = await controller.closeUnticketedRun(run.id)
+
+    expect(closed.status).toBe('closed')
+    expect(closed.abortedAt).toBeUndefined()
+    expect(mockSession.abortCalls).toBe(1)
+    expect(mockSession.disposeCalls).toBe(1)
+  })
+
+  test('does not close ticket-backed runs as unticketed chats', async () => {
+    const mockSession = createMockSession()
+    const now = (() => {
+      let current = 7000
+      return () => ++current
+    })()
+    const controller = new AgentController('/project', {
+      createSession: async () => ({ session: mockSession.session }),
+      createRunId: () => 'run-1',
+      now,
+      loginController: new LoginController({ authStorage: stubAuthStorage, modelRegistry: stubModelRegistry, now }),
+      credentialProvider: stubCredentialProvider,
+      modelRegistry: stubModelRegistry,
+    })
+
+    const run = await controller.createRun(makeTicket({ ticketId: 'awb-1' }))
+    await Promise.resolve()
+
+    await expect(controller.closeUnticketedRun(run.id)).rejects.toThrow('ticket-backed')
   })
 })
