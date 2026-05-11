@@ -149,19 +149,36 @@ Operational assumptions:
 - pi authentication and model configuration come from the user's normal pi setup
 - if no pi auth or no usable model is configured, the panel stays visible and reports the initialization error
 - panel sessions are stored separately from normal pi terminal sessions under `<project>/.awb/pi-sessions/`
+- AWB run metadata, transcript projections, worktree state, and resume health are stored under `<project>/.awb/agent-runs/`
 - project-local pi discovery still applies via the project cwd, including `.pi/extensions/`, `.pi/prompts/`, skills, and `AGENTS.md`
 
 The browser only receives serialized agent state and incremental SSE events. It does not access raw pi SDK objects directly.
 
 Implementation notes:
 
-- `src/agent/createPiSession.ts` creates one embedded pi session using the project directory as `cwd`
-- `src/agent/AgentController.ts` owns panel state, selected-ticket context, prompt submission, aborts, and pi event mapping
-- `src/server.ts` exposes `/api/agent/state`, `/api/agent/events`, `/api/agent/context`, `/api/agent/prompt`, and `/api/agent/abort`
+- `src/agent/createPiSession.ts` creates embedded pi sessions and can reopen a specific AWB-owned pi session file
+- `src/agent/AgentController.ts` owns panel state, selected-ticket context, run lifecycle, prompt submission, aborts, resume, and pi event mapping
+- `src/agent/runStorage.ts` persists one JSON snapshot per AWB run with atomic temp-file replacement
+- `src/server.ts` exposes panel endpoints plus per-run create, prompt, abort, close, worktree, and event APIs
 - `src/web/useAgentPanel.ts` keeps the React state in sync over SSE and incremental event updates
 - `src/web/AgentPanel.tsx` renders the context summary, transcript, tool activity, and prompt composer
 
 See [`wiki/agent-panel-architecture.md`](./wiki/agent-panel-architecture.md) for the detailed architecture and follow-up workflow roadmap.
+
+### Agent run resume
+
+The Agents tab keeps both live and persisted run history. Completed ticket-backed runs can be continued while their live session remains attached, and persisted completed, waiting, or closed runs can be resumed after restart when their recorded pi session file is still available.
+
+Unticketed chats behave like long-lived command-line conversations: after an assistant turn they enter `waiting`, the composer remains available, and `Close chat` releases the live session while keeping history. `Stop` only aborts the current response.
+
+Resume limitations are explicit:
+
+- failed and aborted runs are read-only
+- runs without a pi session file are inspectable but non-resumable
+- missing or invalid pi session files are reported as non-resumable
+- git-worktree runs resume only in their retained worktree; cleaned or missing worktrees are not silently resumed in the main checkout
+
+Regression coverage for this workflow lives primarily in `tests/agent/AgentController.test.ts`, `tests/agent/runStorage.test.ts`, and `tests/web/agentsView.test.tsx`. These cover in-memory continuation, persisted history loading, specific-session reopen, non-resumable states, and desktop/mobile Agents UI rendering.
 
 ## Ticket format
 
@@ -197,6 +214,11 @@ Current mobile-focused selectors include:
 - `data-awb="agent-overlay-close"`
 - `data-awb="agent-panel"` with `data-agent-status` and `data-agent-streaming`
 - `data-awb="agent-send"`, `data-awb="agent-stop"`, and `data-awb="agent-pause"`
+- `data-awb="agents-view"`
+- `data-awb="new-agent-chat"`
+- `data-awb="agent-run-detail"`
+- `data-awb="stop-agent-run"`
+- `data-awb="close-unticketed-chat"`
 
 The current automated mobile regression coverage uses Bun tests for the mobile navigation flow semantics in `tests/web/mobileFlow.test.ts`. A Maestro flow can be layered on top of these selectors later without changing the UI contracts.
 
