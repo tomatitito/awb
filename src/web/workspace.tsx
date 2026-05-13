@@ -1336,9 +1336,15 @@ export function AgentsView({
   const [firstMessage, setFirstMessage] = useState('')
   const [createError, setCreateError] = useState<string | undefined>()
   const [isCreatingRun, setIsCreatingRun] = useState(false)
+  const composerTextAreaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0]
   const isMobile = viewportMode === 'mobile'
   const showDetailOnly = isMobile && Boolean(selectedRunId)
+
+  useEffect(() => {
+    if (!isComposerOpen) return
+    composerTextAreaRef.current?.focus()
+  }, [isComposerOpen])
 
   return (
     <section className="agents-view" data-awb="agents-view">
@@ -1352,9 +1358,12 @@ export function AgentsView({
             type="button"
             className="primary-button"
             data-awb="new-agent-chat"
+            aria-expanded={isComposerOpen}
+            aria-controls="new-agent-chat-form"
             onClick={() => {
               setCreateError(undefined)
-              setIsComposerOpen((current) => !current)
+              setIsComposerOpen(true)
+              composerTextAreaRef.current?.focus()
             }}
           >
             New agent chat
@@ -1364,6 +1373,7 @@ export function AgentsView({
       </header>
       {isComposerOpen ? (
         <form
+          id="new-agent-chat-form"
           className="agents-create-run-form"
           onSubmit={(event) => {
             event.preventDefault()
@@ -1386,7 +1396,13 @@ export function AgentsView({
           }}
         >
           <strong>Start a new unticketed agent conversation</strong>
-          <textarea value={firstMessage} onChange={(event) => setFirstMessage(event.target.value)} placeholder="Describe what you want to refine, explore, or create" rows={4} />
+          <textarea
+            ref={composerTextAreaRef}
+            value={firstMessage}
+            onChange={(event) => setFirstMessage(event.target.value)}
+            placeholder="Describe what you want to refine, explore, or create"
+            rows={4}
+          />
           {createError ? <div className="agent-panel-error">{createError}</div> : null}
           <div className="agent-run-controls">
             <button type="submit" className="primary-button" disabled={isCreatingRun || !firstMessage.trim()}>
